@@ -468,7 +468,7 @@ describe("LoginPage", () => {
     );
 
     expect(
-      screen.getByText(/sign in to multica/i),
+      screen.getByText(/sign in to rimedeck/i),
     ).toBeInTheDocument();
   });
 
@@ -654,7 +654,7 @@ describe("LoginPage", () => {
     await user.click(screen.getByRole("button", { name: /back/i }));
 
     expect(
-      screen.getByText(/sign in to multica/i),
+      screen.getByText(/sign in to rimedeck/i),
     ).toBeInTheDocument();
   });
 
