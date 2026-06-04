@@ -945,17 +945,20 @@ export function setupDaemonManager(
     stopPolling();
     stopLogTail();
 
+    // Always prevent quit on the first pass so we can load prefs
+    // asynchronously. If autoStop is off, re-quit immediately.
+    isQuitting = true;
+    event.preventDefault();
+
     loadPrefs().then(async (prefs) => {
       if (prefs.autoStop) {
-        isQuitting = true;
-        event.preventDefault();
         try {
           await stopDaemon();
         } catch {
           // Best-effort stop on quit
         }
-        app.quit();
       }
+      app.quit();
     });
   });
 }

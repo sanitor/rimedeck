@@ -506,8 +506,14 @@ if (!gotTheLock) {
   }
 }
 
-app.on("before-quit", async () => {
-  await shutdownLocalBackend();
+let localBackendQuitting = false;
+app.on("before-quit", (event) => {
+  if (localBackendQuitting) return;
+  localBackendQuitting = true;
+  event.preventDefault();
+  shutdownLocalBackend()
+    .catch((err) => console.error("[main] local backend shutdown error:", err))
+    .finally(() => app.quit());
 });
 
 app.on("window-all-closed", () => {

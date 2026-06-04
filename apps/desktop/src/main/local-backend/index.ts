@@ -37,6 +37,7 @@ export async function setupLocalBackend(): Promise<{
     result = await startBackend(config, databaseUrl);
   } catch (err) {
     console.error("[local-backend] Backend startup failed:", err);
+    await stopBackend().catch(() => {});
     await stopPostgres();
     throw err;
   }

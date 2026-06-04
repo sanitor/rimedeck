@@ -282,9 +282,9 @@ function BlockingRuntimeConfigError({ message }: { message: string }) {
   return (
     <div className="flex h-screen items-center justify-center bg-background p-8 text-foreground">
       <div className="max-w-xl rounded-lg border bg-card p-6 shadow-sm">
-        <h1 className="text-lg font-semibold">Desktop configuration error</h1>
+        <h1 className="text-lg font-semibold">RimeDeck failed to start</h1>
         <p className="mt-3 text-sm text-muted-foreground">
-          RimeDeck could not load <code>~/.rimedeck/desktop.json</code>. Fix or remove the file and restart the app.
+          The local backend could not be initialized. Check the details below and restart the app.
         </p>
         <pre className="mt-4 whitespace-pre-wrap rounded-md bg-muted p-3 text-xs text-muted-foreground">
           {message}

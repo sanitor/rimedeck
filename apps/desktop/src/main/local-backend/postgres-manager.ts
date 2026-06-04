@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { getRimedeckDir } from "./config";
 import { bundledPgBinDir, isBundledPgAvailable } from "./pg-installer";
 
-const PG_BINS = ["pg_ctl", "initdb", "createdb", "pg_isready"] as const;
+const PG_BINS = ["pg_ctl", "initdb", "createdb", "pg_isready", "psql"] as const;
 const STARTUP_TIMEOUT_MS = 30_000;
 const HEALTH_POLL_MS = 1_000;
 
@@ -14,6 +14,7 @@ interface PgPaths {
   initdb: string;
   createdb: string;
   pg_isready: string;
+  psql: string;
 }
 
 let pgPaths: PgPaths | null = null;
@@ -162,6 +163,7 @@ export async function startPostgres(pgPort: number): Promise<string> {
   ]);
 
   // Wait for readiness
+  let pgReady = false;
   const deadline = Date.now() + STARTUP_TIMEOUT_MS;
   while (Date.now() < deadline) {
     try {
@@ -171,10 +173,16 @@ export async function startPostgres(pgPort: number): Promise<string> {
         "-p",
         String(pgPort),
       ]);
+      pgReady = true;
       break;
     } catch {
       await new Promise((r) => setTimeout(r, HEALTH_POLL_MS));
     }
+  }
+  if (!pgReady) {
+    throw new Error(
+      `PostgreSQL failed to become ready within ${STARTUP_TIMEOUT_MS / 1000}s`,
+    );
   }
 
   // Create database (idempotent)
@@ -191,6 +199,18 @@ export async function startPostgres(pgPort: number): Promise<string> {
     const msg = (err as { stderr?: string }).stderr ?? "";
     if (!msg.includes("already exists")) throw err;
   }
+
+  // Enable pgcrypto extension (required by upstream migrations for gen_random_uuid)
+  await execAsync(pgPaths.psql, [
+    "-h",
+    "127.0.0.1",
+    "-p",
+    String(pgPort),
+    "-d",
+    "multica",
+    "-c",
+    "CREATE EXTENSION IF NOT EXISTS pgcrypto",
+  ]);
 
   const connStr = `postgres://localhost:${pgPort}/multica?sslmode=disable`;
   console.log(`[local-backend] PostgreSQL ready: ${connStr}`);
