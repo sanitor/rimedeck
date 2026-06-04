@@ -11,13 +11,11 @@
 // Graceful: if the archive is already present at the expected path,
 // the download is skipped (idempotent for CI caching).
 
-import { createWriteStream, existsSync } from "node:fs";
-import { mkdir, rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { cp, mkdir, rm } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { pipeline } from "node:stream/promises";
-import { Readable } from "node:stream";
 import { tmpdir } from "node:os";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -69,17 +67,13 @@ await mkdir(workDir, { recursive: true });
 try {
   const archivePath = join(workDir, `postgresql.${ext}`);
 
-  // Download
-  const res = await fetch(downloadUrl, {
-    redirect: "follow",
-    headers: { "User-Agent": "RimeDeck-Desktop-Build/1.0" },
-  });
-  if (!res.ok || !res.body) {
-    throw new Error(`download failed: ${res.status} ${res.statusText}`);
-  }
-  await mkdir(dirname(archivePath), { recursive: true });
-  const nodeStream = Readable.fromWeb(res.body);
-  await pipeline(nodeStream, createWriteStream(archivePath));
+  // Use curl for the download — Node's fetch gets 403 from EDB on CI runners
+  execFileSync("curl", [
+    "-fSL",
+    "-o", archivePath,
+    "-A", "Mozilla/5.0 (compatible; RimeDeck-Build/1.0)",
+    downloadUrl,
+  ], { stdio: "inherit" });
   console.log(`[bundle-pg] downloaded to ${archivePath}`);
 
   // Extract to workDir — EDB archive produces a `pgsql/` subdirectory
@@ -91,16 +85,10 @@ try {
     throw new Error("[bundle-pg] expected pgsql/ directory in archive not found");
   }
 
-  // Move pgsql/ content to resources/pgsql/
+  // Copy pgsql/ content to resources/pgsql/
   await rm(destDir, { recursive: true, force: true });
   await mkdir(dirname(destDir), { recursive: true });
-
-  // Use platform-native move for cross-device compatibility
-  if (process.platform === "win32") {
-    execFileSync("cmd", ["/c", "move", extractedPgsql, destDir], { stdio: "inherit" });
-  } else {
-    execFileSync("mv", [extractedPgsql, destDir], { stdio: "inherit" });
-  }
+  await cp(extractedPgsql, destDir, { recursive: true });
 
   // macOS: ad-hoc codesign PG binaries to avoid Gatekeeper issues
   if (process.platform === "darwin" && targetPlatform === "darwin") {
