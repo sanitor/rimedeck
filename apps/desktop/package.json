@@ -4,6 +4,10 @@
   "version": "0.3.15",
   "private": true,
   "description": "RimeDeck — local-first AI task management desktop app.",
+  "author": {
+    "name": "RimeDeck",
+    "email": "rimedeck@users.noreply.github.com"
+  },
   "homepage": "https://github.com/cjzzz/rimedeck",
   "repository": {
     "type": "git",
