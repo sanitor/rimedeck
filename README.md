@@ -1,4 +1,4 @@
-<img title="" src="file:///C:/Users/zisheng/Documents/cao/00_code/github/rimedeck/rimedeck-icon.png" alt="rimedeck-icon.png" data-align="center" width="153">
+<img width="256" height="256" alt="rimedeck-icon" src="https://github.com/user-attachments/assets/b6d42b07-33d3-4045-ac63-05b708c03025" />
 
 # RimeDeck
 
