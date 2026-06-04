@@ -14,9 +14,6 @@
     "url": "https://github.com/cjzzz/rimedeck.git",
     "directory": "apps/desktop"
   },
-  "author": {
-    "name": "RimeDeck"
-  },
   "license": "UNLICENSED",
   "main": "./out/main/index.js",
   "scripts": {
