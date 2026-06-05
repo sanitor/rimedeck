@@ -11,7 +11,7 @@ import { useT } from "../../i18n";
  * editorial shell's `<aside>` column.
  */
 export function RuntimeAsidePanel() {
-  const { t, i18n } = useT("onboarding");
+  const { t } = useT("onboarding");
   const installDocHref = "https://github.com/caozisheng/rimedeck";
   return (
     <div className="flex flex-col gap-6">

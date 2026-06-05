@@ -15,7 +15,7 @@ export function WebhookEventFilterSection({
   filters,
   onChange,
 }: WebhookEventFilterSectionProps) {
-  const { t, i18n } = useT("autopilots");
+  const { t } = useT("autopilots");
   const [newEvent, setNewEvent] = useState("");
   const [newActions, setNewActions] = useState("");
   const docsHref = "https://github.com/caozisheng/rimedeck";
