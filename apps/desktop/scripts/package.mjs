@@ -113,7 +113,7 @@ export function normalizeGitVersion(raw) {
 }
 
 function deriveVersion() {
-  return normalizeGitVersion(sh("git describe --tags --always --dirty"));
+  return normalizeGitVersion(sh("git describe --tags --match 'v*' --always --dirty"));
 }
 
 function uniqueOrdered(values) {
