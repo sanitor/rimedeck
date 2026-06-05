@@ -2,11 +2,24 @@
 
 # RimeDeck
 
-RimeDeck is a local-first AI agent workbench — organize a productive group of agents on your desktop, with zero Docker and zero cloud dependency. Forked from [Multica](https://github.com/multica-ai/multica).
+RimeDeck is a local-first AI agent workbench with a built-in Kanban board — manage issues, orchestrate a team of AI coding agents, and track progress in one desktop app, with zero Docker and zero cloud dependency. Forked from [Multica](https://github.com/multica-ai/multica).
 
 ## Why RimeDeck
 
 Multica's desktop app connects to a cloud backend. RimeDeck removes that dependency: it embeds PostgreSQL and the Go server as child processes inside the Electron app. Double-click to launch — the app starts the database, runs migrations, spawns the server, and opens the UI. No Docker, no remote API, no manual setup.
+
+### Issue Tracking & Kanban
+
+RimeDeck includes a full-featured issue tracker designed for human-agent collaboration:
+
+- **Kanban Board** — drag-and-drop cards between status columns (Backlog / Todo / In Progress / In Review / Done / Blocked / Cancelled), group by status or assignee
+- **Swimlane View** — two-axis layout grouped by parent issue, project, or assignee with status columns
+- **List View** — flat sortable table with inline editing
+- **Gantt Chart** — project-level timeline view with due dates
+- **Drag-and-drop** — move issues across columns/swimlanes to update status, priority, or assignee in one gesture
+- **Sub-issues** — break work into hierarchical sub-tasks with progress tracking
+- **Projects** — group issues into projects with resource attachments (GitHub repos, docs, links)
+- **Filters & Sort** — filter by status, priority, assignee, project, label; sort by creation date, update date, priority, or manual order
 
 <img width="630" height="400" alt="image" src="https://github.com/user-attachments/assets/116bf358-e8bb-4b0a-a3dd-c553a5a86222" /> 
 <img width="630" height="400" alt="image" src="https://github.com/user-attachments/assets/98bd1ca2-6708-41a5-8722-7424aba97463" />
@@ -14,22 +27,25 @@ Multica's desktop app connects to a cloud backend. RimeDeck removes that depende
 
 ## Supported Runtimes
 
-RimeDeck supports 12 AI coding tools as agent runtimes. The daemon auto-detects installed tools on your machine during setup.
+RimeDeck supports 13 AI coding tools as agent runtimes. The daemon auto-detects installed tools on your machine during setup.
 
 | Runtime | CLI | Provider |
 |---------|-----|----------|
-| Antigravity | `antigravity` | Google |
+| Antigravity | `agy` | Google |
 | Claude Code | `claude` | Anthropic |
 | Codex | `codex` | OpenAI |
-| Copilot | `github-copilot` | GitHub / Microsoft |
-| Cursor | `cursor` | Cursor |
+| Copilot | `copilot` | GitHub / Microsoft |
+| Cursor | `cursor-agent` | Cursor |
 | Gemini CLI | `gemini` | Google |
-| Hermes | `hermes` | — |
+| Hermes | `hermes` | NousResearch |
 | Kimi | `kimi` | Moonshot AI |
-| Kiro CLI | `kiro` | Amazon |
+| Kiro CLI | `kiro-cli` | Amazon |
+| OMP (oh-my-pi) | `omp` | — |
 | OpenCode | `opencode` | — |
 | OpenClaw | `openclaw` | — |
 | Pi | `pi` | — |
+
+> **OMP** ([oh-my-pi](https://github.com/can1357/oh-my-pi)) is a community fork of Pi with hash-anchored edits, LSP integration, subagents, and 40+ model providers. It shares the same JSON event-stream protocol as Pi, so it works out-of-the-box. Set `MULTICA_OMP_PATH` to point at a non-default binary, or `MULTICA_OMP_MODEL` to pin a default model.
 
 ## Architecture
 
