@@ -1442,8 +1442,10 @@ func TestInjectRuntimeConfigQuickCreateOutputPrefixAgnostic(t *testing.T) {
 
 	for _, want := range []string{
 		"quick-create task",
-		"Created <identifier-or-id>: <title>",
-		"identifier` from JSON output",
+		"already been created",
+		"multica issue update",
+		"Updated <identifier-or-id>: <title>",
+		"identifier` from the update response",
 		"Do not assume any workspace issue prefix",
 	} {
 		if !strings.Contains(s, want) {

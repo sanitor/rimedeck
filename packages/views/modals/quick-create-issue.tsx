@@ -284,7 +284,7 @@ export function AgentCreatePanel({
     setSubmitting(true);
     setError(null);
     try {
-      await api.quickCreateIssue({
+      const res = await api.quickCreateIssue({
         ...(actor.type === "agent"
           ? { agent_id: actor.id }
           : { squad_id: actor.id }),
@@ -296,9 +296,10 @@ export function AgentCreatePanel({
       setLastProjectId(projectId);
       clearPrompt();
       setLastMode("agent");
-      toast.success(t(($) => $.create_issue.agent.toast_sent), {
-        duration: 4000,
-      });
+      toast.success(
+        `${res.issue.identifier}: ${t(($) => $.create_issue.agent.toast_sent)}`,
+        { duration: 4000 },
+      );
       if (keepOpen) {
         // Stay open for continuous creation — clear the editor so the
         // user can immediately type the next prompt.

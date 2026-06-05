@@ -1679,10 +1679,12 @@ type QuickCreateIssueRequest struct {
 	ParentIssueID string `json:"parent_issue_id,omitempty"`
 }
 
-// QuickCreateIssueResponse echoes the queued task id so the frontend can
-// correlate the eventual inbox item, even though completion is fully async.
+// QuickCreateIssueResponse returns the pre-created issue (immediately visible
+// on the kanban) alongside the task id. The agent will refine the issue's
+// title/description/priority in the background.
 type QuickCreateIssueResponse struct {
-	TaskID string `json:"task_id"`
+	TaskID string        `json:"task_id"`
+	Issue  IssueResponse `json:"issue"`
 }
 
 func (h *Handler) QuickCreateIssue(w http.ResponseWriter, r *http.Request) {
@@ -1844,14 +1846,115 @@ func (h *Handler) QuickCreateIssue(w http.ResponseWriter, r *http.Request) {
 		parentIssueUUID = pid
 	}
 
-	task, err := h.TaskService.EnqueueQuickCreateTask(r.Context(), wsUUID, requesterUUID, agentUUID, squadUUID, prompt, projectUUID, parentIssueUUID)
+	// === Pre-create the issue so it appears on the kanban immediately ===
+	tx, err := h.TxStarter.Begin(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create issue")
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	qtx := h.Queries.WithTx(tx)
+	issueNumber, err := qtx.IncrementIssueCounter(r.Context(), wsUUID)
+	if err != nil {
+		slog.Warn("quick-create: increment issue counter failed", append(logger.RequestAttrs(r), "error", err)...)
+		writeError(w, http.StatusInternalServerError, "failed to create issue")
+		return
+	}
+
+	var assigneeType pgtype.Text
+	var assigneeID pgtype.UUID
+	if hasSquad {
+		assigneeType = pgtype.Text{String: "squad", Valid: true}
+		assigneeID = squadUUID
+	} else {
+		assigneeType = pgtype.Text{String: "agent", Valid: true}
+		assigneeID = agentUUID
+	}
+
+	newPosition, err := issueposition.NextTopPosition(r.Context(), tx, wsUUID, "todo")
+	if err != nil {
+		slog.Warn("quick-create: get next issue position failed", append(logger.RequestAttrs(r), "error", err)...)
+		writeError(w, http.StatusInternalServerError, "failed to create issue")
+		return
+	}
+
+	issue, err := qtx.CreateIssue(r.Context(), db.CreateIssueParams{
+		WorkspaceID:   wsUUID,
+		Title:         deriveQuickCreateTitle(prompt),
+		Description:   pgtype.Text{},
+		Status:        "todo",
+		Priority:      "none",
+		AssigneeType:  assigneeType,
+		AssigneeID:    assigneeID,
+		CreatorType:   "member",
+		CreatorID:     requesterUUID,
+		ParentIssueID: parentIssueUUID,
+		Position:      newPosition,
+		StartDate:     pgtype.Timestamptz{},
+		DueDate:       pgtype.Timestamptz{},
+		Number:        issueNumber,
+		ProjectID:     projectUUID,
+	})
+	if err != nil {
+		slog.Warn("quick-create: create issue failed", append(logger.RequestAttrs(r), "error", err)...)
+		writeError(w, http.StatusInternalServerError, "failed to create issue")
+		return
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create issue")
+		return
+	}
+
+	// Subscribe the requester so they get follow-up notifications immediately.
+	if err := h.Queries.AddIssueSubscriber(r.Context(), db.AddIssueSubscriberParams{
+		IssueID:  issue.ID,
+		UserType: "member",
+		UserID:   requesterUUID,
+		Reason:   "creator",
+	}); err != nil {
+		slog.Warn("quick-create: subscribe requester failed",
+			"issue_id", uuidToString(issue.ID),
+			"requester_id", uuidToString(requesterUUID),
+			"error", err,
+		)
+	}
+
+	prefix := h.getIssuePrefix(r.Context(), issue.WorkspaceID)
+	issueResp := issueToResponse(issue, prefix)
+
+	// Broadcast so all connected clients (kanban, list views) see the issue.
+	h.publish(protocol.EventIssueCreated, workspaceID, "member", requesterID, map[string]any{"issue": issueResp})
+
+	// === Enqueue the agent task to refine the issue ===
+	task, err := h.TaskService.EnqueueQuickCreateTask(r.Context(), wsUUID, requesterUUID, agentUUID, squadUUID, prompt, issue.ID, projectUUID, parentIssueUUID)
 	if err != nil {
 		slog.Warn("quick-create enqueue failed", append(logger.RequestAttrs(r), "error", err)...)
 		writeError(w, http.StatusInternalServerError, "failed to enqueue quick-create task")
 		return
 	}
 
-	writeJSON(w, http.StatusAccepted, QuickCreateIssueResponse{TaskID: uuidToString(task.ID)})
+	writeJSON(w, http.StatusAccepted, QuickCreateIssueResponse{
+		TaskID: uuidToString(task.ID),
+		Issue:  issueResp,
+	})
+}
+
+// deriveQuickCreateTitle extracts a temporary title from the user's prompt.
+// The agent will replace this with a better title via `multica issue update`.
+func deriveQuickCreateTitle(prompt string) string {
+	const maxLen = 80
+	title := strings.TrimSpace(prompt)
+	if len([]rune(title)) <= maxLen {
+		return title
+	}
+	runes := []rune(title)[:maxLen]
+	// Try to truncate at a word boundary (last space within the limit).
+	if idx := strings.LastIndex(string(runes), " "); idx > maxLen/2 {
+		return string([]rune(title)[:idx]) + "..."
+	}
+	return string(runes) + "..."
 }
 
 // writeAgentUnavailable returns 422 with a stable error code so the modal

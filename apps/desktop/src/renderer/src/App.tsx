@@ -49,6 +49,9 @@ function AppContent() {
   const autoLoginAttempted = useRef(false);
 
   // Auto-login for local mode — no login dialog needed.
+  // The Go server accepts the dev verification code (MULTICA_DEV_VERIFICATION_CODE)
+  // without a prior sendCode call, so we skip sendCode entirely to avoid the
+  // per-email rate limit that would block auto-login on rapid app restarts.
   useEffect(() => {
     if (isLoading || bootstrapping || user || autoLoginAttempted.current) return;
     autoLoginAttempted.current = true;
@@ -57,8 +60,7 @@ function AppContent() {
     (async () => {
       setBootstrapping(true);
       try {
-        const { sendCode, verifyCode } = useAuthStore.getState();
-        await sendCode(LOCAL_EMAIL);
+        const { verifyCode } = useAuthStore.getState();
         await verifyCode(LOCAL_EMAIL, LOCAL_CODE);
         const wsList = await api.listWorkspaces();
         qc.setQueryData(workspaceKeys.list(), wsList);

@@ -11,11 +11,9 @@ import (
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
 
-// TestQuickCreateCompletion_SubscribesRequester locks in the fix for the
-// quick-create requester not being subscribed to the issue: the agent runs
-// the CLI and is recorded as the issue's creator, so the issue:created event
-// only auto-subscribes the agent. The completion path must explicitly
-// subscribe the human requester so they receive follow-up notifications.
+// TestQuickCreateCompletion_SubscribesRequester locks in the precreated-issue
+// flow: quick-create completion must use the task's existing issue_id rather
+// than looking up an issue stamped with origin_type=quick_create.
 func TestQuickCreateCompletion_SubscribesRequester(t *testing.T) {
 	ctx := context.Background()
 	queries := db.New(testPool)
@@ -30,12 +28,35 @@ func TestQuickCreateCompletion_SubscribesRequester(t *testing.T) {
 		t.Fatalf("load fixture agent: %v", err)
 	}
 
+	// Pre-create the issue (mimics the handler).
+	number, err := queries.IncrementIssueCounter(ctx, parseUUID(testWorkspaceID))
+	if err != nil {
+		t.Fatalf("IncrementIssueCounter: %v", err)
+	}
+	issue, err := queries.CreateIssue(ctx, db.CreateIssueParams{
+		WorkspaceID: parseUUID(testWorkspaceID),
+		Title:       "server-precreated bug",
+		Description: pgtype.Text{String: "placeholder", Valid: true},
+		Status:      "todo",
+		Priority:    "none",
+		CreatorType: "member",
+		CreatorID:   parseUUID(testUserID),
+		Number:      number,
+	})
+	if err != nil {
+		t.Fatalf("CreateIssue: %v", err)
+	}
+	t.Cleanup(func() {
+		testPool.Exec(context.Background(), `DELETE FROM issue WHERE id = $1`, issue.ID)
+	})
+
 	task, err := taskSvc.EnqueueQuickCreateTask(ctx,
 		parseUUID(testWorkspaceID),
 		parseUUID(testUserID),
 		parseUUID(agentID),
 		pgtype.UUID{},
 		"please file a bug",
+		issue.ID,
 		pgtype.UUID{},
 		pgtype.UUID{},
 	)
@@ -56,28 +77,6 @@ func TestQuickCreateCompletion_SubscribesRequester(t *testing.T) {
 		t.Fatalf("StartAgentTask: %v", err)
 	}
 
-	number, err := queries.IncrementIssueCounter(ctx, parseUUID(testWorkspaceID))
-	if err != nil {
-		t.Fatalf("IncrementIssueCounter: %v", err)
-	}
-	issue, err := queries.CreateIssueWithOrigin(ctx, db.CreateIssueWithOriginParams{
-		WorkspaceID: parseUUID(testWorkspaceID),
-		Title:       "agent-filed bug",
-		Status:      "todo",
-		Priority:    "none",
-		CreatorType: "agent",
-		CreatorID:   parseUUID(agentID),
-		Number:      number,
-		OriginType:  pgtype.Text{String: "quick_create", Valid: true},
-		OriginID:    task.ID,
-	})
-	if err != nil {
-		t.Fatalf("CreateIssueWithOrigin: %v", err)
-	}
-	t.Cleanup(func() {
-		testPool.Exec(context.Background(), `DELETE FROM issue WHERE id = $1`, issue.ID)
-	})
-
 	if _, err := taskSvc.CompleteTask(ctx, task.ID, []byte(`{"output":"done"}`), "", ""); err != nil {
 		t.Fatalf("CompleteTask: %v", err)
 	}
@@ -87,10 +86,9 @@ func TestQuickCreateCompletion_SubscribesRequester(t *testing.T) {
 	}
 }
 
-// TestQuickCreateFailure_DoesNotSubscribeRequester confirms the failure path
-// (agent finished without producing an issue) does not invent a subscriber
-// row — there is nothing to subscribe to.
-func TestQuickCreateFailure_DoesNotSubscribeRequester(t *testing.T) {
+// TestQuickCreateFailure_WritesFailureInbox confirms that when a quick-create
+// task fails, the completion path writes a failure inbox notification.
+func TestQuickCreateFailure_WritesFailureInbox(t *testing.T) {
 	ctx := context.Background()
 	queries := db.New(testPool)
 	bus := events.New()
@@ -104,12 +102,34 @@ func TestQuickCreateFailure_DoesNotSubscribeRequester(t *testing.T) {
 		t.Fatalf("load fixture agent: %v", err)
 	}
 
+	// Pre-create the issue.
+	number, err := queries.IncrementIssueCounter(ctx, parseUUID(testWorkspaceID))
+	if err != nil {
+		t.Fatalf("IncrementIssueCounter: %v", err)
+	}
+	issue, err := queries.CreateIssue(ctx, db.CreateIssueParams{
+		WorkspaceID: parseUUID(testWorkspaceID),
+		Title:       "will-fail bug",
+		Status:      "todo",
+		Priority:    "none",
+		CreatorType: "member",
+		CreatorID:   parseUUID(testUserID),
+		Number:      number,
+	})
+	if err != nil {
+		t.Fatalf("CreateIssue: %v", err)
+	}
+	t.Cleanup(func() {
+		testPool.Exec(context.Background(), `DELETE FROM issue WHERE id = $1`, issue.ID)
+	})
+
 	task, err := taskSvc.EnqueueQuickCreateTask(ctx,
 		parseUUID(testWorkspaceID),
 		parseUUID(testUserID),
 		parseUUID(agentID),
 		pgtype.UUID{},
 		"another bug",
+		issue.ID,
 		pgtype.UUID{},
 		pgtype.UUID{},
 	)
@@ -130,23 +150,22 @@ func TestQuickCreateFailure_DoesNotSubscribeRequester(t *testing.T) {
 		t.Fatalf("StartAgentTask: %v", err)
 	}
 
-	// No issue with origin_type=quick_create + this task id exists. Completion
-	// hits the failure branch and writes a failure inbox; no subscriber row.
-	if _, err := taskSvc.CompleteTask(ctx, task.ID, []byte(`{"output":"done"}`), "", ""); err != nil {
-		t.Fatalf("CompleteTask: %v", err)
+	// Fail the task — the completion handler should write a failure inbox.
+	if err := taskSvc.FailTask(ctx, task.ID, "agent crashed", "agent_error"); err != nil {
+		t.Fatalf("FailTask: %v", err)
 	}
 
-	var leaked int
+	// Verify a failure inbox was created.
+	var inboxCount int
 	if err := testPool.QueryRow(ctx, `
-		SELECT COUNT(*)
-		FROM issue_subscriber s
-		JOIN issue i ON i.id = s.issue_id
-		WHERE s.user_type = 'member' AND s.user_id = $1
-		  AND i.origin_type = 'quick_create' AND i.origin_id = $2
-	`, testUserID, task.ID).Scan(&leaked); err != nil {
-		t.Fatalf("count leaked subscribers: %v", err)
+		SELECT COUNT(*) FROM inbox_item
+		WHERE type = 'quick_create_failed'
+		  AND recipient_type = 'member'
+		  AND recipient_id = $1
+	`, testUserID).Scan(&inboxCount); err != nil {
+		t.Fatalf("count inbox: %v", err)
 	}
-	if leaked != 0 {
-		t.Fatalf("expected no subscriber rows for failed quick-create, got %d", leaked)
+	if inboxCount == 0 {
+		t.Fatal("expected a quick_create_failed inbox item after task failure")
 	}
 }

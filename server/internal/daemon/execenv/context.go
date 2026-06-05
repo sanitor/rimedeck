@@ -433,13 +433,14 @@ func renderIssueContext(provider string, ctx TaskContextForEnv) string {
 }
 
 // renderQuickCreateContext renders issue_context.md for quick-create tasks.
-// This file carries only task data (user input, skills). Behavioral rules
-// and guardrails live in AGENTS.md (runtime config) and the per-turn prompt
-// to avoid redundancy and conflicting instructions.
+// The issue has been pre-created by the server; the agent's job is to refine it.
 func renderQuickCreateContext(ctx TaskContextForEnv) string {
 	var b strings.Builder
 	b.WriteString("# Quick Create\n\n")
 	b.WriteString("**Trigger:** Quick-create modal\n\n")
+	if ctx.IssueID != "" {
+		fmt.Fprintf(&b, "**Pre-created Issue:** %s\n\n", ctx.IssueID)
+	}
 	b.WriteString("## User input\n\n")
 	b.WriteString("> ")
 	b.WriteString(ctx.QuickCreatePrompt)

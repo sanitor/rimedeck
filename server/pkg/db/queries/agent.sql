@@ -147,11 +147,11 @@ VALUES (
 RETURNING *;
 
 -- name: CreateQuickCreateTask :one
--- Quick-create tasks have no issue / chat / autopilot link; the entire job
--- description (prompt, requester, workspace) lives in context JSONB. The
--- daemon detects this variant via context.type == "quick_create".
+-- Quick-create tasks carry a pre-created issue_id (the server creates the
+-- issue up front so it appears on the kanban immediately) and a context JSONB
+-- with type == "quick_create" that the daemon uses to build the agent prompt.
 INSERT INTO agent_task_queue (agent_id, runtime_id, issue_id, status, priority, context)
-VALUES ($1, $2, NULL, 'queued', $3, $4)
+VALUES ($1, $2, $3, 'queued', $4, $5)
 RETURNING *;
 
 -- name: LinkTaskToIssue :exec

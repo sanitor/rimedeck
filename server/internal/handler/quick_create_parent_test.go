@@ -139,7 +139,11 @@ func TestQuickCreateIssueParentTrustBoundary(t *testing.T) {
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("decode response: %v", err)
 		}
+		if resp.Issue.ID == "" {
+			t.Fatal("expected quick-create response to include the precreated issue")
+		}
 		t.Cleanup(func() {
+			testPool.Exec(context.Background(), `DELETE FROM issue WHERE id = $1`, resp.Issue.ID)
 			testPool.Exec(context.Background(), `DELETE FROM agent_task_queue WHERE id = $1`, resp.TaskID)
 		})
 
@@ -147,9 +151,10 @@ func TestQuickCreateIssueParentTrustBoundary(t *testing.T) {
 		// the daemon claim step reads this field to attach the parent
 		// identifier and to inject `--parent <uuid>` into the prompt.
 		var contextJSON []byte
+		var linkedIssueID string
 		if err := testPool.QueryRow(context.Background(),
-			`SELECT context FROM agent_task_queue WHERE id = $1`, resp.TaskID,
-		).Scan(&contextJSON); err != nil {
+			`SELECT context, issue_id::text FROM agent_task_queue WHERE id = $1`, resp.TaskID,
+		).Scan(&contextJSON, &linkedIssueID); err != nil {
 			t.Fatalf("load task context: %v", err)
 		}
 		var qc service.QuickCreateContext
@@ -161,6 +166,9 @@ func TestQuickCreateIssueParentTrustBoundary(t *testing.T) {
 		}
 		if qc.ParentIssueID != localParentID {
 			t.Fatalf("expected parent_issue_id=%q in context, got %q", localParentID, qc.ParentIssueID)
+		}
+		if linkedIssueID != resp.Issue.ID {
+			t.Fatalf("expected quick-create task to be pre-linked to issue %q, got %q", resp.Issue.ID, linkedIssueID)
 		}
 	})
 

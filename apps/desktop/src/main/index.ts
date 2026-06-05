@@ -12,6 +12,7 @@ import { handleAppShortcut } from "./keyboard-shortcuts";
 import { installNavigationGestures } from "./navigation-gestures";
 import { getAppVersion } from "./app-version";
 import { setupLocalBackend, shutdownLocalBackend } from "./local-backend";
+import { showSplash, updateSplashStatus, closeSplash } from "./splash";
 import type { RuntimeConfigResult } from "../shared/runtime-config";
 import {
   createElectronReloadPrompt,
@@ -337,8 +338,22 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(async () => {
+    electronApp.setAppUserModelId(
+      is.dev ? "ai.rimedeck.app.dev" : "ai.rimedeck.app",
+    );
+
+    // macOS: replace the default Electron dock icon with the bundled logo
+    // so the Canary dev build is visually distinct from a stock Electron
+    // run. `app.dock` is macOS-only — guard the call.
+    if (is.dev && process.platform === "darwin" && app.dock) {
+      const icon = nativeImage.createFromPath(BUNDLED_ICON_PATH);
+      if (!icon.isEmpty()) app.dock.setIcon(icon);
+    }
+
+    showSplash(BUNDLED_ICON_PATH);
+
     try {
-      const localBackend = await setupLocalBackend();
+      const localBackend = await setupLocalBackend(updateSplashStatus);
       runtimeConfigResult = {
         ok: true,
         config: {
@@ -361,17 +376,7 @@ if (!gotTheLock) {
       };
     }
 
-    electronApp.setAppUserModelId(
-      is.dev ? "ai.rimedeck.app.dev" : "ai.rimedeck.app",
-    );
-
-    // macOS: replace the default Electron dock icon with the bundled logo
-    // so the Canary dev build is visually distinct from a stock Electron
-    // run. `app.dock` is macOS-only — guard the call.
-    if (is.dev && process.platform === "darwin" && app.dock) {
-      const icon = nativeImage.createFromPath(BUNDLED_ICON_PATH);
-      if (!icon.isEmpty()) app.dock.setIcon(icon);
-    }
+    closeSplash();
 
     app.on("browser-window-created", (_, window) => {
       optimizer.watchWindowShortcuts(window);

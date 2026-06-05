@@ -503,7 +503,7 @@ export class ApiClient {
     prompt: string;
     project_id?: string | null;
     parent_issue_id?: string | null;
-  }): Promise<{ task_id: string }> {
+  }): Promise<{ task_id: string; issue: Issue }> {
     return this.fetch("/api/issues/quick-create", {
       method: "POST",
       body: JSON.stringify(data),

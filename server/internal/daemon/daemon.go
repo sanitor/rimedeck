@@ -2658,10 +2658,10 @@ func (d *Daemon) runTask(ctx context.Context, task Task, provider string, slot i
 	if task.AutopilotID != "" {
 		agentEnv["MULTICA_AUTOPILOT_ID"] = task.AutopilotID
 	}
-	// Quick-create marker — when set, the multica CLI's `issue create`
-	// command stamps the new issue with origin_type=quick_create +
-	// origin_id=<task_id> so the completion handler can find it
-	// deterministically (see GetIssueByOrigin).
+	// Quick-create marker — kept for backwards compat. The issue is now
+	// pre-created by the server, so the agent uses `multica issue update`
+	// instead of `multica issue create`. The env var lets the agent (and
+	// any tooling) detect that this is a quick-create context.
 	if task.QuickCreatePrompt != "" {
 		agentEnv["MULTICA_QUICK_CREATE_TASK_ID"] = task.ID
 	}

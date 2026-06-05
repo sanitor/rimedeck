@@ -14,32 +14,32 @@ import (
 //     references were actually fetched
 //   - hard-line rules being silently dropped on prompt rewrites
 func TestBuildQuickCreatePromptRules(t *testing.T) {
-	out := buildQuickCreatePrompt(Task{QuickCreatePrompt: "fix the login button color"})
+	out := buildQuickCreatePrompt(Task{
+		QuickCreatePrompt: "fix the login button color",
+		IssueID:           "test-issue-id",
+		IssueIdentifier:   "TOM-42",
+	})
 
 	mustContain := []string{
+		"An issue has already been created",
+		"TOM-42",
+		"test-issue-id",
+		"multica issue update",
 		// high-fidelity invariant
 		"Faithfully restate what the user wants",
 		"Preserve specific names, identifiers, file paths",
-		// strip non-spec material: verbal routing wrappers + conversational fillers
+		// strip non-spec material
 		"verbal routing wrappers about creating the issue",
 		"pure conversational fillers",
-		// cc routing must survive: mention link stays in description so the
-		// auto-subscribe path fires (multica issue create has no --subscriber flag)
+		// cc routing
 		"CC exception",
 		"auto-subscribes members",
-		// context section is conditional and must not be an apology log
+		// context section
 		"include ONLY when the input cited external resources",
 		"never use it as an apology log",
-		// output/reporting must be workspace-prefix agnostic. Workspaces can
-		// use custom issue prefixes, so a successful issue creation should
-		// not look failed merely because the identifier does not match one
-		// fixed prefix.
-		"multica issue create --output json",
-		"JSON response",
-		"identifier",
-		"Do not scrape human output",
-		"do not assume any workspace issue prefix",
-		"Created <identifier-or-id>: <title>",
+		// output format
+		"Updated TOM-42",
+		"Do NOT call `multica issue create`",
 		// hard rules
 		"never invent requirements",
 		"never reduce multi-sentence input",
@@ -57,13 +57,15 @@ func TestBuildQuickCreatePromptRules(t *testing.T) {
 // input like "assign to <SquadName>" silently fell through to
 // "Unrecognized assignee" because squads were never queried.
 func TestBuildQuickCreatePromptAssigneeIncludesSquads(t *testing.T) {
-	out := buildQuickCreatePrompt(Task{QuickCreatePrompt: "fix the login button color"})
+	out := buildQuickCreatePrompt(Task{
+		QuickCreatePrompt: "fix the login button color",
+		IssueID:           "test-id",
+		IssueIdentifier:   "TOM-1",
+	})
 	mustContain := []string{
 		"multica squad list",
-		"Squads are first-class assignees",
 		"Treat bare @-routing as an assignee directive",
 		"让 @独立团 review 这个 PR",
-		"pass the squad's `id` as `--assignee-id`",
 	}
 	for _, s := range mustContain {
 		if !strings.Contains(out, s) {
@@ -79,42 +81,29 @@ func TestBuildQuickCreatePromptAssigneeIncludesSquads(t *testing.T) {
 // "default to YOURSELF" instruction made squad-created issues land under
 // the leader, hiding them from the squad's delegation flow.
 func TestBuildQuickCreatePromptSquadDefaultsToSquad(t *testing.T) {
+	// After the pre-creation refactor, the server sets the assignee to the squad.
+	// The prompt tells the agent not to change it unless the user explicitly names
+	// someone. Verify the prompt mentions the update command and issue.
 	const (
-		squadID   = "aaaa1111-2222-3333-4444-555555555555"
-		squadName = "独立团"
-		leaderID  = "bbbb1111-2222-3333-4444-666666666666"
+		squadID  = "aaaa1111-2222-3333-4444-555555555555"
+		leaderID = "bbbb1111-2222-3333-4444-666666666666"
 	)
 	out := buildQuickCreatePrompt(Task{
 		QuickCreatePrompt: "fix the login button color",
 		Agent:             &AgentData{ID: leaderID, Name: "leader-agent"},
 		SquadID:           squadID,
-		SquadName:         squadName,
+		SquadName:         "独立团",
+		IssueID:           "test-issue",
+		IssueIdentifier:   "TOM-5",
 	})
 
-	// The default-assignee instruction must point at the squad UUID.
-	if !strings.Contains(out, "--assignee-id \""+squadID+"\"") {
-		t.Errorf("buildQuickCreatePrompt with SquadID must default to the squad's UUID, got:\n%s", out)
+	// The prompt should tell the agent the default assignee is already correct.
+	if !strings.Contains(out, "default is already correct") {
+		t.Errorf("buildQuickCreatePrompt should tell agent the default assignee is already correct, got:\n%s", out)
 	}
-	// And it must NOT tell the agent to default to itself (the leader).
+	// Must not tell the agent to default to itself (the leader).
 	if strings.Contains(out, "--assignee-id \""+leaderID+"\"") {
-		t.Errorf("buildQuickCreatePrompt with SquadID must NOT default to the leader agent's UUID, got:\n%s", out)
-	}
-	// The squad name should appear in the instruction so the agent has
-	// human-readable context for the routing decision.
-	if !strings.Contains(out, squadName) {
-		t.Errorf("buildQuickCreatePrompt with SquadID should mention the squad name %q, got:\n%s", squadName, out)
-	}
-	// And the prompt must explicitly call out the squad-vs-leader rule
-	// so the agent does not silently regress to "default to YOURSELF".
-	mustContain := []string{
-		"picker SQUAD",
-		"running on the squad's behalf",
-		"do not assign it to your own agent UUID",
-	}
-	for _, s := range mustContain {
-		if !strings.Contains(out, s) {
-			t.Errorf("buildQuickCreatePrompt with SquadID missing %q\n--- output ---\n%s", s, out)
-		}
+		t.Errorf("buildQuickCreatePrompt with SquadID must NOT tell agent to default to the leader's UUID, got:\n%s", out)
 	}
 }
 
@@ -125,32 +114,18 @@ func TestBuildQuickCreatePromptSquadDefaultsToSquad(t *testing.T) {
 // "I have to retype 'in project X' every time" failure mode the modal
 // addition was meant to fix.
 func TestBuildQuickCreatePromptProjectPinning(t *testing.T) {
-	const projectID = "11111111-2222-3333-4444-555555555555"
+	// After the pre-creation refactor, the server sets the project on the issue.
+	// The prompt tells the agent not to pass --project.
 	out := buildQuickCreatePrompt(Task{
 		QuickCreatePrompt: "fix the login button color",
-		ProjectID:         projectID,
-		ProjectTitle:      "Web App",
+		IssueID:           "test-id",
+		IssueIdentifier:   "TOM-1",
 	})
-	mustContain := []string{
-		"--project \"" + projectID + "\"",
-		"Web App",
-		"modal selection is authoritative",
+	if !strings.Contains(out, "already set by the server") {
+		t.Errorf("buildQuickCreatePrompt must tell agent project is already set, got:\n%s", out)
 	}
-	for _, s := range mustContain {
-		if !strings.Contains(out, s) {
-			t.Errorf("buildQuickCreatePrompt with project missing %q\n--- output ---\n%s", s, out)
-		}
-	}
-
-	// Without a project, the prompt must keep the legacy "omit" instruction
-	// so the agent doesn't accidentally start passing --project on plain
-	// quick-create runs.
-	plain := buildQuickCreatePrompt(Task{QuickCreatePrompt: "fix the login button color"})
-	if !strings.Contains(plain, "**project**: omit") {
-		t.Errorf("buildQuickCreatePrompt without project must keep the omit instruction, got:\n%s", plain)
-	}
-	if strings.Contains(plain, "--project") {
-		t.Errorf("buildQuickCreatePrompt without project must NOT mention --project, got:\n%s", plain)
+	if !strings.Contains(out, "Do NOT pass `--project`") {
+		t.Errorf("buildQuickCreatePrompt must tell agent not to pass --project, got:\n%s", out)
 	}
 }
 
@@ -163,43 +138,18 @@ func TestBuildQuickCreatePromptProjectPinning(t *testing.T) {
 // standalone issue and the sub-issue relationship would be silently
 // dropped.
 func TestBuildQuickCreatePromptParentPinning(t *testing.T) {
-	const (
-		parentID         = "33333333-2222-1111-4444-555555555555"
-		parentIdentifier = "MUL-2534"
-	)
+	// After the pre-creation refactor, the server sets the parent on the issue.
+	// The prompt tells the agent not to pass --parent.
 	out := buildQuickCreatePrompt(Task{
-		QuickCreatePrompt:     "fix the login button color",
-		ParentIssueID:         parentID,
-		ParentIssueIdentifier: parentIdentifier,
-	})
-	mustContain := []string{
-		"--parent \"" + parentID + "\"",
-		parentIdentifier,
-		"modal entry point is authoritative",
-		"filed as a sub-issue",
-	}
-	for _, s := range mustContain {
-		if !strings.Contains(out, s) {
-			t.Errorf("buildQuickCreatePrompt with parent missing %q\n--- output ---\n%s", s, out)
-		}
-	}
-
-	// When only the UUID is available (identifier lookup failed on claim),
-	// the agent must still get the --parent instruction so the sub-issue
-	// intent isn't silently dropped.
-	uuidOnly := buildQuickCreatePrompt(Task{
 		QuickCreatePrompt: "fix the login button color",
-		ParentIssueID:     parentID,
+		IssueID:           "test-id",
+		IssueIdentifier:   "TOM-1",
 	})
-	if !strings.Contains(uuidOnly, "--parent \""+parentID+"\"") {
-		t.Errorf("buildQuickCreatePrompt with parent UUID only must still pin --parent, got:\n%s", uuidOnly)
+	if !strings.Contains(out, "already set by the server") {
+		t.Errorf("buildQuickCreatePrompt must tell agent parent is already set, got:\n%s", out)
 	}
-
-	// Without a parent, the prompt must NOT mention --parent at all — a
-	// plain quick-create run should not start filing sub-issues.
-	plain := buildQuickCreatePrompt(Task{QuickCreatePrompt: "fix the login button color"})
-	if strings.Contains(plain, "--parent") {
-		t.Errorf("buildQuickCreatePrompt without parent must NOT mention --parent, got:\n%s", plain)
+	if !strings.Contains(out, "Do NOT pass") {
+		t.Errorf("buildQuickCreatePrompt must tell agent not to pass --parent, got:\n%s", out)
 	}
 }
 

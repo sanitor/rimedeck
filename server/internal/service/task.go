@@ -528,6 +528,7 @@ type QuickCreateContext struct {
 	Prompt      string `json:"prompt"`
 	RequesterID string `json:"requester_id"`
 	WorkspaceID string `json:"workspace_id"`
+	IssueID     string `json:"issue_id,omitempty"`
 	ProjectID   string `json:"project_id,omitempty"`
 	SquadID     string `json:"squad_id,omitempty"`
 	// ParentIssueID is the optional UUID of the parent issue the new issue
@@ -542,26 +543,19 @@ type QuickCreateContext struct {
 // QuickCreateContextType marks a task as a quick-create job.
 const QuickCreateContextType = "quick_create"
 
-// EnqueueQuickCreateTask creates a queued task that has no issue / chat /
-// autopilot link — the user's natural-language prompt is stored in the
-// task's context JSONB and the agent is expected to translate it into a
-// `multica issue create` call. Pre-validates that the agent is reachable
-// (not archived, has a runtime) so the API can reject up-front rather than
-// queue a task no one will ever claim.
+// EnqueueQuickCreateTask creates a queued task linked to a pre-created issue.
+// The server creates the issue up front so it appears on the kanban immediately;
+// the agent's job is to refine it (update title, description, priority) via
+// `multica issue update`. Pre-validates that the agent is reachable (not
+// archived, has a runtime) so the API can reject up-front.
 //
-// projectID is optional (zero-valued pgtype.UUID when the user didn't pick
-// one). The handler is responsible for validating it belongs to the same
-// workspace before passing it in.
+// issueID is the pre-created issue the agent will update; it must be valid.
 //
 // squadID is non-empty (Valid) when the user picked a squad as the actor.
 // The handler has already resolved it to the squad's leader agent for
 // agentID; the squadID hint is stamped into the task context so the daemon
 // claim handler can inject the squad-leader briefing on dispatch.
-//
-// parentIssueID is optional (zero-valued pgtype.UUID when the user didn't
-// open the modal from "Add sub issue"). The handler is responsible for
-// validating it belongs to the same workspace before passing it in.
-func (s *TaskService) EnqueueQuickCreateTask(ctx context.Context, workspaceID, requesterID pgtype.UUID, agentID, squadID pgtype.UUID, prompt string, projectID, parentIssueID pgtype.UUID) (db.AgentTaskQueue, error) {
+func (s *TaskService) EnqueueQuickCreateTask(ctx context.Context, workspaceID, requesterID pgtype.UUID, agentID, squadID pgtype.UUID, prompt string, issueID, projectID, parentIssueID pgtype.UUID) (db.AgentTaskQueue, error) {
 	agent, err := s.Queries.GetAgent(ctx, agentID)
 	if err != nil {
 		return db.AgentTaskQueue{}, fmt.Errorf("load agent: %w", err)
@@ -578,6 +572,9 @@ func (s *TaskService) EnqueueQuickCreateTask(ctx context.Context, workspaceID, r
 		Prompt:      prompt,
 		RequesterID: util.UUIDToString(requesterID),
 		WorkspaceID: util.UUIDToString(workspaceID),
+	}
+	if issueID.Valid {
+		payload.IssueID = util.UUIDToString(issueID)
 	}
 	if projectID.Valid {
 		payload.ProjectID = util.UUIDToString(projectID)
@@ -596,6 +593,7 @@ func (s *TaskService) EnqueueQuickCreateTask(ctx context.Context, workspaceID, r
 	task, err := s.Queries.CreateQuickCreateTask(ctx, db.CreateQuickCreateTaskParams{
 		AgentID:   agentID,
 		RuntimeID: agent.RuntimeID,
+		IssueID:   issueID,
 		Priority:  priorityToInt("high"),
 		Context:   contextJSON,
 	})
@@ -606,17 +604,13 @@ func (s *TaskService) EnqueueQuickCreateTask(ctx context.Context, workspaceID, r
 	slog.Info("quick-create task enqueued",
 		"task_id", util.UUIDToString(task.ID),
 		"agent_id", util.UUIDToString(agentID),
+		"issue_id", util.UUIDToString(issueID),
 		"squad_id", payload.SquadID,
 		"requester_id", util.UUIDToString(requesterID),
 		"workspace_id", util.UUIDToString(workspaceID),
 		"project_id", payload.ProjectID,
 		"parent_issue_id", payload.ParentIssueID,
 	)
-	// Match every other Enqueue* path: kick the daemon WS so the task
-	// gets claimed promptly instead of waiting for the next 30 s poll
-	// cycle. Without this the user perceives "quick create never
-	// triggered" because the modal closes immediately and the task
-	// sits in 'queued' until the next sleepWithContextOrWakeup tick.
 	s.NotifyTaskEnqueued(ctx, task)
 	return task, nil
 }
@@ -1094,7 +1088,11 @@ func (s *TaskService) CompleteTask(ctx context.Context, taskID pgtype.UUID, resu
 	// tasks, TriggerCommentID threads the fallback under the original comment;
 	// for assignment-triggered tasks it is NULL and the fallback is top-level.
 	// Chat tasks have no IssueID and are handled separately below.
-	if task.IssueID.Valid {
+	// Quick-create tasks have an IssueID (pre-created) but the agent's job is
+	// to update the issue, not comment — skip the fallback comment path.
+	qc, isQuickCreate := s.parseQuickCreateContext(task)
+
+	if task.IssueID.Valid && !isQuickCreate {
 		suppressNoActionComment, err := HasSquadLeaderNoActionEvaluationForTask(ctx, s.Queries, task)
 		if err != nil {
 			slog.Warn("checking squad leader no_action evaluation failed",
@@ -1113,10 +1111,6 @@ func (s *TaskService) CompleteTask(ctx context.Context, taskID pgtype.UUID, resu
 			var payload protocol.TaskCompletedPayload
 			if err := json.Unmarshal(result, &payload); err == nil {
 				if payload.Output != "" {
-					// Match the CLI's --content / --description behavior: agents that
-					// emit literal `\n` 4-char sequences (Python/JSON-style) get them
-					// decoded into real newlines before the comment hits the DB. See
-					// util.UnescapeBackslashEscapes for the exact contract.
 					body := util.UnescapeBackslashEscapes(payload.Output)
 					if task.TriggerCommentID.Valid && isTrivialDoneOutput(body) {
 						slog.Warn("suppressing trivial comment-trigger fallback output",
@@ -1132,13 +1126,9 @@ func (s *TaskService) CompleteTask(ctx context.Context, taskID pgtype.UUID, resu
 		}
 	}
 
-	// Quick-create tasks: locate the issue the agent just created and push
-	// an inbox confirmation to the requester. The agent has no issue / chat
-	// link, so the regular completion paths above don't apply. We find the
-	// new issue by querying for the most recent issue this agent created in
-	// the requester's workspace since the task started — more robust than
-	// parsing the agent's stdout for an identifier.
-	if qc, ok := s.parseQuickCreateContext(task); ok {
+	// Quick-create tasks: push an inbox confirmation to the requester.
+	// The issue was pre-created by the server; the agent refined it.
+	if isQuickCreate {
 		s.notifyQuickCreateCompleted(ctx, task, qc)
 	}
 
@@ -2045,11 +2035,11 @@ func issueToMap(issue db.Issue, issuePrefix string) map[string]any {
 
 // parseQuickCreateContext returns the quick-create payload if the task's
 // context JSONB contains type == "quick_create"; otherwise the bool is
-// false so callers can short-circuit. Tasks linked to an issue / chat /
-// autopilot are never quick-create even if they happen to carry a
-// context blob, so those are filtered up front.
+// false so callers can short-circuit. Chat and autopilot tasks are excluded
+// up front; quick-create tasks now carry an issue_id (pre-created by the
+// server) so issue_id presence alone no longer disqualifies.
 func (s *TaskService) parseQuickCreateContext(task db.AgentTaskQueue) (QuickCreateContext, bool) {
-	if task.IssueID.Valid || task.ChatSessionID.Valid || task.AutopilotRunID.Valid {
+	if task.ChatSessionID.Valid || task.AutopilotRunID.Valid {
 		return QuickCreateContext{}, false
 	}
 	if len(task.Context) == 0 {
@@ -2066,12 +2056,9 @@ func (s *TaskService) parseQuickCreateContext(task db.AgentTaskQueue) (QuickCrea
 }
 
 // notifyQuickCreateCompleted writes a success inbox notification to the
-// requester pointing at the issue the agent just created. The issue is
-// stamped with origin_type=quick_create + origin_id=<task_id> by the
-// daemon-injected MULTICA_QUICK_CREATE_TASK_ID env var, so this lookup is
-// deterministic — robust against the same agent creating other issues in
-// parallel (e.g. assignment task running while max_concurrent_tasks > 1
-// permits another quick-create alongside it).
+// requester. The issue was pre-created by the server and linked to the task
+// at enqueue time, so we read it directly from task.IssueID — no origin
+// lookup or post-hoc linking needed.
 func (s *TaskService) notifyQuickCreateCompleted(ctx context.Context, task db.AgentTaskQueue, qc QuickCreateContext) {
 	requesterID, err := util.ParseUUID(qc.RequesterID)
 	if err != nil {
@@ -2083,71 +2070,27 @@ func (s *TaskService) notifyQuickCreateCompleted(ctx context.Context, task db.Ag
 		slog.Warn("quick-create completion: invalid workspace id", "task_id", util.UUIDToString(task.ID), "error", err)
 		return
 	}
-	issue, err := s.Queries.GetIssueByOrigin(ctx, db.GetIssueByOriginParams{
-		WorkspaceID: workspaceID,
-		OriginType:  pgtype.Text{String: "quick_create", Valid: true},
-		OriginID:    task.ID,
-	})
-	if err != nil {
-		// No issue created — agent ran to completion but the CLI call must
-		// have failed. Surface as a failure inbox so the user sees something.
-		slog.Warn("quick-create completion: no issue found, writing failure inbox",
+
+	if !task.IssueID.Valid {
+		slog.Warn("quick-create completion: task has no issue_id",
 			"task_id", util.UUIDToString(task.ID),
 			"agent_id", util.UUIDToString(task.AgentID),
-			"workspace_id", qc.WorkspaceID,
 		)
-		s.notifyQuickCreateFailed(ctx, task, qc, "agent finished without creating an issue")
+		s.notifyQuickCreateFailed(ctx, task, qc, "task has no linked issue")
 		return
 	}
 
-	// Link the new issue back to this task so subsequent reads of the task
-	// (Activity tab, Recent work, etc.) render it as a normal issue task
-	// (kind = "direct") instead of staying on the "Creating issue" active-
-	// wording label. Best-effort: a write failure here doesn't block the
-	// inbox notification, which is the more important signal to the user.
-	if err := s.Queries.LinkTaskToIssue(ctx, db.LinkTaskToIssueParams{
-		ID:      task.ID,
-		IssueID: issue.ID,
-	}); err != nil {
-		slog.Warn("quick-create completion: link task→issue failed",
+	issue, err := s.Queries.GetIssue(ctx, task.IssueID)
+	if err != nil {
+		slog.Warn("quick-create completion: issue not found",
 			"task_id", util.UUIDToString(task.ID),
-			"issue_id", util.UUIDToString(issue.ID),
+			"issue_id", util.UUIDToString(task.IssueID),
 			"error", err,
 		)
+		s.notifyQuickCreateFailed(ctx, task, qc, "linked issue not found")
+		return
 	}
 
-	// Subscribe the requester so they receive notifications for follow-up
-	// comments and updates. The DB row's creator_type/creator_id is the
-	// agent (it ran the CLI), but the human who triggered the quick-create
-	// is the semantic creator from a UX perspective — without this they
-	// only see the one-shot completion inbox and miss everything after.
-	// Best-effort: log on failure but don't block the inbox notification.
-	if err := s.Queries.AddIssueSubscriber(ctx, db.AddIssueSubscriberParams{
-		IssueID:  issue.ID,
-		UserType: "member",
-		UserID:   requesterID,
-		Reason:   "creator",
-	}); err != nil {
-		slog.Warn("quick-create completion: subscribe requester failed",
-			"task_id", util.UUIDToString(task.ID),
-			"issue_id", util.UUIDToString(issue.ID),
-			"requester_id", qc.RequesterID,
-			"error", err,
-		)
-	} else {
-		s.Bus.Publish(events.Event{
-			Type:        protocol.EventSubscriberAdded,
-			WorkspaceID: qc.WorkspaceID,
-			ActorType:   "agent",
-			ActorID:     util.UUIDToString(task.AgentID),
-			Payload: map[string]any{
-				"issue_id":  util.UUIDToString(issue.ID),
-				"user_type": "member",
-				"user_id":   qc.RequesterID,
-				"reason":    "creator",
-			},
-		})
-	}
 	prefix := s.getIssuePrefix(workspaceID)
 	identifier := fmt.Sprintf("%s-%d", prefix, issue.Number)
 	details, _ := json.Marshal(map[string]any{

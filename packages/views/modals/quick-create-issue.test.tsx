@@ -11,6 +11,12 @@ const mockClearPrompt = vi.hoisted(() => vi.fn());
 const mockSetKeepOpen = vi.hoisted(() => vi.fn());
 const mockSetLastMode = vi.hoisted(() => vi.fn());
 const mockToastSuccess = vi.hoisted(() => vi.fn());
+const mockRecordRecentIssue = vi.hoisted(() => vi.fn());
+const mockQueryClient = vi.hoisted(() => ({
+  getQueriesData: vi.fn(),
+  setQueryData: vi.fn(),
+  invalidateQueries: vi.fn(),
+}));
 
 const mockQuickCreateStore = {
   lastActorType: null as "agent" | "squad" | null,
@@ -62,6 +68,7 @@ vi.mock("@tanstack/react-query", () => ({
         return { data: [] };
     }
   },
+  useQueryClient: () => mockQueryClient,
 }));
 
 vi.mock("@multica/core/api", () => ({
@@ -101,6 +108,12 @@ vi.mock("@multica/core/issues/stores/quick-create-store", () => ({
 vi.mock("@multica/core/issues/stores/create-mode-store", () => ({
   useCreateModeStore: (selector?: (state: { setLastMode: typeof mockSetLastMode }) => unknown) =>
     (selector ? selector({ setLastMode: mockSetLastMode }) : { setLastMode: mockSetLastMode }),
+}));
+
+vi.mock("@multica/core/issues/stores", () => ({
+  useRecentIssuesStore: {
+    getState: () => ({ recordVisit: mockRecordRecentIssue }),
+  },
 }));
 
 vi.mock("@multica/core/auth", () => ({
@@ -286,7 +299,34 @@ describe("AgentCreatePanel", () => {
     mockProjectsQuery.data = [];
     mockProjectsQuery.isSuccess = true;
     mockSquadsData.list = [];
-    mockQuickCreateIssue.mockResolvedValue(undefined);
+    mockQuickCreateIssue.mockResolvedValue({
+      task_id: "task-1",
+      issue: {
+        id: "issue-1",
+        workspace_id: "ws-test",
+        number: 1,
+        identifier: "TST-1",
+        title: "New agent prompt",
+        description: null,
+        status: "todo",
+        priority: "none",
+        assignee_type: "agent",
+        assignee_id: "agent-1",
+        creator_type: "member",
+        creator_id: "user-1",
+        parent_issue_id: null,
+        project_id: null,
+        position: 1,
+        start_date: null,
+        due_date: null,
+        metadata: {},
+        created_at: "2026-06-05T00:00:00Z",
+        updated_at: "2026-06-05T00:00:00Z",
+      },
+    });
+    mockQueryClient.getQueriesData.mockReturnValue([
+      [["issues", "ws-test", "list"], { byStatus: { todo: { issues: [], total: 0 } } }],
+    ]);
     mockSetKeepOpen.mockImplementation((value: boolean) => {
       mockQuickCreateStore.keepOpen = value;
     });
@@ -332,6 +372,8 @@ describe("AgentCreatePanel", () => {
     expect(mockSetLastProjectId).toHaveBeenCalledWith(null);
     expect(mockClearPrompt).toHaveBeenCalled();
     expect(mockSetLastMode).toHaveBeenCalledWith("agent");
+    expect(mockQueryClient.setQueryData).toHaveBeenCalled();
+    expect(mockRecordRecentIssue).toHaveBeenCalledWith("ws-test", "issue-1");
     expect(onClose).toHaveBeenCalled();
   });
 

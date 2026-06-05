@@ -547,10 +547,11 @@ func buildMetaSkillContent(provider string, ctx TaskContextForEnv) string {
 		// that doesn't propagate the user message into its working context
 		// (or a resumed session) still avoids the assignment-task workflow
 		// pointing at an empty issue id.
-		b.WriteString("**This task was triggered by quick-create.** There is NO existing Multica issue. Follow the field and output rules in the user message you just received; ignore the default assignment-task workflow.\n\n")
+		b.WriteString("**This task was triggered by quick-create.** An issue has already been created by the server with a placeholder title. Follow the field and output rules in the user message you just received; ignore the default assignment-task workflow.\n\n")
 		b.WriteString("Hard guardrails (apply even if the user message is missing):\n")
-		b.WriteString("- Run exactly one `multica issue create` invocation, then exit.\n")
-		b.WriteString("- Do NOT call `multica issue get`, `multica issue status`, or `multica issue comment add` for this task — there is no issue to query, transition, or comment on. The platform writes the user's success/failure inbox notification automatically based on whether `multica issue create` succeeded.\n")
+		b.WriteString("- Run exactly one `multica issue update` invocation to refine the issue, then exit.\n")
+		b.WriteString("- Do NOT call `multica issue create` — the issue already exists; creating a new one would produce a duplicate.\n")
+		b.WriteString("- Do NOT call `multica issue get`, `multica issue status`, or `multica issue comment add` for this task. The platform writes the user's success/failure inbox notification automatically.\n")
 		b.WriteString("- If the CLI returns an error, exit with that error as the only output. Do not retry.\n\n")
 	} else if ctx.AutopilotRunID != "" {
 		// Autopilot run_only task: no issue exists, so the agent must not
@@ -696,9 +697,10 @@ func buildMetaSkillContent(provider string, ctx TaskContextForEnv) string {
 	case ctx.AutopilotRunID != "":
 		b.WriteString("This is a run-only autopilot task, so there may be no issue comment to post. Your final assistant output is captured automatically as the autopilot run result. Keep it concise and state the outcome.\n")
 	case ctx.QuickCreatePrompt != "":
-		b.WriteString("This is a quick-create task. There is NO existing issue to comment on. Your final stdout is captured automatically and the platform writes the user's success/failure inbox notification based on whether `multica issue create` succeeded.\n\n")
-		b.WriteString("- Do NOT call `multica issue comment add` — the issue you just created has no conversation context for this run.\n")
-		b.WriteString("- Print exactly one final line: `Created <identifier-or-id>: <title>` after a successful `multica issue create`. Use the created issue's `identifier` from JSON output when available; otherwise use its `id`. Do not assume any workspace issue prefix such as `MUL-`; workspaces can use custom prefixes.\n")
+		b.WriteString("This is a quick-create task. An issue has already been created by the server; your job is to refine it via `multica issue update`. Your final stdout is captured automatically and the platform writes the user's success/failure inbox notification.\n\n")
+		b.WriteString("- Do NOT call `multica issue create` — the issue already exists. Creating a new one would produce a duplicate.\n")
+		b.WriteString("- Do NOT call `multica issue comment add` — there is nothing to comment on for this run.\n")
+		b.WriteString("- Print exactly one final line: `Updated <identifier-or-id>: <title>` after a successful `multica issue update`. Use the issue's `identifier` from the update response when available; otherwise use its `id`. Do not assume any workspace issue prefix such as `MUL-`; workspaces can use custom prefixes.\n")
 		b.WriteString("- On CLI failure, exit with the CLI error as the only output. The platform translates that into a `quick_create_failed` inbox item carrying the original prompt for the user.\n")
 	default:
 		if ctx.IsSquadLeader {

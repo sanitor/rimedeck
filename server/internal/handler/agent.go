@@ -159,8 +159,9 @@ type AgentTaskResponse struct {
 	ID          string `json:"id"`
 	AgentID     string `json:"agent_id"`
 	RuntimeID   string `json:"runtime_id"`
-	IssueID     string `json:"issue_id"`
-	WorkspaceID string `json:"workspace_id"`
+	IssueID         string `json:"issue_id"`
+	IssueIdentifier string `json:"issue_identifier,omitempty"`
+	WorkspaceID     string `json:"workspace_id"`
 	// WorkspaceContext is the workspace-level system prompt set in workspace
 	// settings (`workspace.context` DB column). Injected into the agent brief
 	// as `## Workspace Context` so every agent running in this workspace —
@@ -427,8 +428,13 @@ func computeTaskKind(t db.AgentTaskQueue) string {
 	if uuidToString(t.AutopilotRunID) != "" {
 		return "autopilot"
 	}
-	if uuidToString(t.IssueID) == "" {
-		return "quick_create"
+	if len(t.Context) > 0 {
+		var ctx struct {
+			Type string `json:"type"`
+		}
+		if json.Unmarshal(t.Context, &ctx) == nil && ctx.Type == "quick_create" {
+			return "quick_create"
+		}
 	}
 	if uuidToString(t.TriggerCommentID) != "" {
 		return "comment"
