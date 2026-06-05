@@ -112,6 +112,9 @@ export function normalizeGitVersion(raw) {
 }
 
 function deriveVersion() {
+  if (process.env.RELEASE_VERSION) {
+    return process.env.RELEASE_VERSION.replace(/^v/, "");
+  }
   return normalizeGitVersion(sh("git describe --tags --match 'v*' --always --dirty"));
 }
 
