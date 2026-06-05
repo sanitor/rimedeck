@@ -12,6 +12,25 @@ Multica's desktop app connects to a cloud backend. RimeDeck removes that depende
 <img width="630" height="400" alt="image" src="https://github.com/user-attachments/assets/98bd1ca2-6708-41a5-8722-7424aba97463" />
 <img width="630" height="400" alt="image" src="https://github.com/user-attachments/assets/fafabdd9-b4f3-4ebc-807a-c184ec1a58a3" />
 
+## Supported Runtimes
+
+RimeDeck supports 12 AI coding tools as agent runtimes. The daemon auto-detects installed tools on your machine during setup.
+
+| Runtime | CLI | Provider |
+|---------|-----|----------|
+| Antigravity | `antigravity` | Google |
+| Claude Code | `claude` | Anthropic |
+| Codex | `codex` | OpenAI |
+| Copilot | `github-copilot` | GitHub / Microsoft |
+| Cursor | `cursor` | Cursor |
+| Gemini CLI | `gemini` | Google |
+| Hermes | `hermes` | — |
+| Kimi | `kimi` | Moonshot AI |
+| Kiro CLI | `kiro` | Amazon |
+| OpenCode | `opencode` | — |
+| OpenClaw | `openclaw` | — |
+| Pi | `pi` | — |
+
 ## Architecture
 
 ### Launch Sequence

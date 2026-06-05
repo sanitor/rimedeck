@@ -40,6 +40,11 @@ var (
 // gate for staging or production users running stale stable releases.
 var devDescribeRe = regexp.MustCompile(`^v?\d+\.\d+\.\d+-\d+-g[0-9a-fA-F]+`)
 
+// bareCommitRe matches a bare commit hash (7-40 hex chars) from
+// `git rev-parse --short HEAD` when no reachable tag exists. Desktop dev
+// builds commonly report this shape.
+var bareCommitRe = regexp.MustCompile(`^[0-9a-fA-F]{7,40}$`)
+
 // CheckMinCLIVersion returns nil when `detected` parses as ≥ minimum. Returns
 // ErrCLIVersionMissing for empty or unparsable input, and ErrCLIVersionTooOld
 // when parsable but below the minimum. The caller can check for these
@@ -53,7 +58,7 @@ func CheckMinCLIVersion(detected string) error {
 	if d == "" {
 		return ErrCLIVersionMissing
 	}
-	if devDescribeRe.MatchString(d) {
+	if devDescribeRe.MatchString(d) || bareCommitRe.MatchString(d) {
 		return nil
 	}
 	parsed, err := parseSemver(d)

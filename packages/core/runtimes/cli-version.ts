@@ -32,6 +32,10 @@ const SEMVER_RE = /v?(\d+)\.(\d+)\.(\d+)/;
 // the gate for staging or production users running stale stable releases.
 const DEV_DESCRIBE_RE = /^v?\d+\.\d+\.\d+-\d+-g[0-9a-fA-F]+/;
 
+// Bare commit hash (7-40 hex chars) from `git rev-parse --short HEAD` when
+// the build has no reachable tag. Desktop dev builds commonly report this.
+const BARE_COMMIT_RE = /^[0-9a-fA-F]{7,40}$/;
+
 function parseSemver(raw: string): [number, number, number] | null {
   const m = SEMVER_RE.exec(raw.trim());
   if (!m) return null;
@@ -53,7 +57,7 @@ function lessThan(a: [number, number, number], b: [number, number, number]) {
  */
 export function checkQuickCreateCliVersion(detected: string | undefined | null): CliVersionCheck {
   const current = (detected ?? "").trim();
-  if (DEV_DESCRIBE_RE.test(current)) {
+  if (DEV_DESCRIBE_RE.test(current) || BARE_COMMIT_RE.test(current)) {
     return { state: "ok", current, min: MIN_QUICK_CREATE_CLI_VERSION };
   }
   const parsed = current ? parseSemver(current) : null;
