@@ -2,28 +2,15 @@
 
 # RimeDeck
 
-RimeDeck is a local-first AI agent workbench — organize a productive group of agents on your desktop, with zero Docker and zero cloud dependency. Forked from [Multica](https://github.com/cjzzz/multica).
+RimeDeck is a local-first AI agent workbench — organize a productive group of agents on your desktop, with zero Docker and zero cloud dependency. Forked from [Multica](https://github.com/multica-ai/multica).
 
 ## Why RimeDeck
 
 Multica's desktop app connects to a cloud backend. RimeDeck removes that dependency: it embeds PostgreSQL and the Go server as child processes inside the Electron app. Double-click to launch — the app starts the database, runs migrations, spawns the server, and opens the UI. No Docker, no remote API, no manual setup.
 
-## Naming Convention
-
-RimeDeck is forked from Multica. The Go binary names and some environment variables retain their original names to minimize changes to the Go backend:
-
-| Item | Name | Reason |
-| --- | --- | --- |
-| Product name | **RimeDeck** | Rebranded |
-| Go server binary | `multica-server` | Go backend unchanged |
-| CLI binary | `multica` | Go backend unchanged |
-| Migration binary | `multica-migrate` | Go backend unchanged |
-| Go env vars | `MULTICA_DEV_VERIFICATION_CODE`, `MULTICA_PUBLIC_URL`, `MULTICA_APP_URL` | Read by Go server |
-| TypeScript packages | `@multica/*` | Too many internal references |
-| Config directory | `~/.rimedeck/` | Rebranded |
-| Workspaces | `~/.rimedeck/workspaces/` | Rebranded |
-| Protocol handler | `rimedeck://` | Rebranded |
-| App ID | `ai.rimedeck.app` | Rebranded |
+<img width="630" height="400" alt="image" src="https://github.com/user-attachments/assets/116bf358-e8bb-4b0a-a3dd-c553a5a86222" /> 
+<img width="630" height="400" alt="image" src="https://github.com/user-attachments/assets/98bd1ca2-6708-41a5-8722-7424aba97463" />
+<img width="630" height="400" alt="image" src="https://github.com/user-attachments/assets/fafabdd9-b4f3-4ebc-807a-c184ec1a58a3" />
 
 ## Architecture
 
@@ -96,7 +83,7 @@ All user data lives under `~/.rimedeck/`:
 - **Node.js** 22+
 - **pnpm** 10+ (`corepack enable && corepack prepare pnpm@latest --activate`)
 - **Go** 1.24+ (for the backend server and CLI)
-- **PostgreSQL** 17 (via Docker or local install — only needed for development; the packaged app bundles its own)
+- **PostgreSQL** 17 (the packaged app bundles its own)
 
 ## Quick Start
 
@@ -157,21 +144,6 @@ pnpm typecheck        # TypeScript check across all packages
 pnpm test             # Unit tests (Vitest)
 pnpm lint             # ESLint
 ```
-
-## Versioning & Release
-
-```bash
-# Bump version across all packages + create git tag
-node scripts/bump-version.mjs patch    # 0.2.0 → 0.2.1
-node scripts/bump-version.mjs minor    # 0.2.0 → 0.3.0
-node scripts/bump-version.mjs 1.0.0    # explicit version
-
-# Push tag to trigger CI release
-git add -A && git commit -m "chore: bump version to X.Y.Z"
-git push && git push --tags
-```
-
-Pushing a `v*.*.*` tag triggers the GitHub Actions workflow that builds and publishes desktop installers (macOS dmg/zip, Windows exe, Linux AppImage/deb/rpm) to GitHub Releases. You can also manually trigger the release from Actions → Release Desktop → Run workflow.
 
 The desktop app checks for updates automatically via GitHub Releases. Users can also manually check in Settings → Updates.
 
