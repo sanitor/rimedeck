@@ -83,7 +83,7 @@ All user data lives under `~/.rimedeck/`:
 - **Node.js** 22+
 - **pnpm** 10+ (`corepack enable && corepack prepare pnpm@latest --activate`)
 - **Go** 1.24+ (for the backend server and CLI)
-- **PostgreSQL** 17 (via Docker or local install — only needed for development; the packaged app bundles its own)
+- **PostgreSQL** 17 (the packaged app bundles its own)
 
 ## Quick Start
 
