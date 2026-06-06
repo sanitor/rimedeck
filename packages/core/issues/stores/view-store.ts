@@ -27,6 +27,7 @@ export interface CardProperties {
   project: boolean;
   childProgress: boolean;
   labels: boolean;
+  parentBadge: boolean;
 }
 
 export interface ActorFilterValue {
@@ -57,6 +58,7 @@ export const CARD_PROPERTY_OPTIONS: { key: keyof CardProperties; label: string }
   { key: "project", label: "Project" },
   { key: "labels", label: "Labels" },
   { key: "childProgress", label: "Sub-issue progress" },
+  { key: "parentBadge", label: "Parent issue" },
 ];
 
 export interface IssueViewState {
@@ -141,6 +143,7 @@ export const viewStoreSlice = (set: StoreApi<IssueViewState>["setState"]): Issue
     project: true,
     childProgress: true,
     labels: true,
+    parentBadge: true,
   },
   listCollapsedStatuses: [],
   ganttZoom: "week",

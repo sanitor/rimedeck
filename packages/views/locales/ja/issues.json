@@ -74,7 +74,8 @@
     "card_due_date": "期限",
     "card_project": "プロジェクト",
     "card_labels": "ラベル",
-    "card_child_progress": "サブイシューの進捗"
+    "card_child_progress": "サブイシューの進捗",
+    "card_parent_badge": "親イシュー"
   },
   "view": {
     "tooltip_board": "ボード表示",

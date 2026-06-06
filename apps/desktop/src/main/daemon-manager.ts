@@ -91,8 +91,8 @@ function healthPortForProfile(profile: string): number {
 
 function profileDir(profile: string): string {
   return profile
-    ? join(homedir(), ".multica", "profiles", profile)
-    : join(homedir(), ".multica");
+    ? join(homedir(), ".rimedeck", "profiles", profile)
+    : join(homedir(), ".rimedeck");
 }
 
 function profileConfigPath(profile: string): string {
@@ -220,7 +220,7 @@ async function probeTokenValidity(profile: string): Promise<AuthProbeResult> {
 
 // Desktop owns a dedicated CLI profile named after the target API host, so it
 // never reads or writes the user's hand-configured profiles. Profile dir:
-//   ~/.multica/profiles/desktop-<host>/
+//   ~/.rimedeck/profiles/desktop-<host>/
 function deriveProfileName(targetUrl: string): string {
   try {
     const url = new URL(targetUrl);
@@ -704,7 +704,7 @@ async function loadPrefs(): Promise<DaemonPrefs> {
 }
 
 async function savePrefs(prefs: DaemonPrefs): Promise<void> {
-  const dir = join(homedir(), ".multica");
+  const dir = join(homedir(), ".rimedeck");
   await mkdir(dir, { recursive: true });
   await writeFile(PREFS_PATH, JSON.stringify(prefs, null, 2), "utf-8");
 }

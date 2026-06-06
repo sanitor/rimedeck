@@ -36,6 +36,7 @@ import {
   issueMatchesGroup,
   getMoveUpdates,
 } from "../utils/drag-utils";
+import { useRelationshipFocusStore } from "@multica/core/issues/stores/relationship-focus-store";
 
 function isStatusGroup(
   group: BoardColumnGroup,
@@ -266,6 +267,7 @@ export function BoardView({
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {
       isDraggingRef.current = true;
+      useRelationshipFocusStore.getState().clearFocus();
       const issue = issueMapRef.current.get(event.active.id as string) ?? null;
       setActiveIssue(issue);
     },
@@ -413,6 +415,8 @@ export function BoardView({
                 sort={sort}
                 projectId={projectId}
                 sortLabel={sortLabel}
+                parentIssueMap={issueMapRef.current}
+                allIssues={groupedIssues}
               />
             ) : (
               assigneeGroupQueryKey && assigneeGroupFilter ? (
@@ -427,6 +431,8 @@ export function BoardView({
                   sort={sort}
                   projectId={projectId}
                   sortLabel={sortLabel}
+                  parentIssueMap={issueMapRef.current}
+                  allIssues={groupedIssues}
                 />
               ) : (
                 <BoardColumn
@@ -438,6 +444,8 @@ export function BoardView({
                   projectId={projectId}
                   totalCount={group.totalCount}
                   sortLabel={sortLabel}
+                  parentIssueMap={issueMapRef.current}
+                  allIssues={groupedIssues}
                 />
               )
             ),
@@ -474,6 +482,8 @@ const PaginatedAssigneeBoardColumn = memo(function PaginatedAssigneeBoardColumn(
   sort,
   projectId,
   sortLabel,
+  parentIssueMap,
+  allIssues,
 }: {
   group: BoardColumnGroup;
   issueIds: string[];
@@ -484,6 +494,8 @@ const PaginatedAssigneeBoardColumn = memo(function PaginatedAssigneeBoardColumn(
   sort?: IssueSortParam;
   projectId?: string;
   sortLabel?: string | null;
+  parentIssueMap?: Map<string, Issue>;
+  allIssues?: Issue[];
 }) {
   const { loadMore, hasMore, isLoading, total } = useLoadMoreByAssigneeGroup(
     {
@@ -504,6 +516,8 @@ const PaginatedAssigneeBoardColumn = memo(function PaginatedAssigneeBoardColumn(
       totalCount={total}
       projectId={projectId}
       sortLabel={sortLabel}
+      parentIssueMap={parentIssueMap}
+      allIssues={allIssues}
       footer={
         hasMore ? (
           <InfiniteScrollSentinel onVisible={loadMore} loading={isLoading} />
@@ -522,6 +536,8 @@ const PaginatedBoardColumn = memo(function PaginatedBoardColumn({
   sort,
   projectId,
   sortLabel,
+  parentIssueMap,
+  allIssues,
 }: {
   group: BoardColumnGroup & { status: IssueStatus };
   issueIds: string[];
@@ -531,6 +547,8 @@ const PaginatedBoardColumn = memo(function PaginatedBoardColumn({
   sort?: IssueSortParam;
   projectId?: string;
   sortLabel?: string | null;
+  parentIssueMap?: Map<string, Issue>;
+  allIssues?: Issue[];
 }) {
   const { loadMore, hasMore, isLoading, total } = useLoadMoreByStatus(
     group.status,
@@ -546,6 +564,8 @@ const PaginatedBoardColumn = memo(function PaginatedBoardColumn({
       totalCount={total}
       projectId={projectId}
       sortLabel={sortLabel}
+      parentIssueMap={parentIssueMap}
+      allIssues={allIssues}
       footer={
         hasMore ? (
           <InfiniteScrollSentinel onVisible={loadMore} loading={isLoading} />

@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, memo } from "react";
+import { useCallback, useRef, memo } from "react";
 import { AppLink } from "../../navigation";
 import { useSortable, defaultAnimateLayoutChanges } from "@dnd-kit/sortable";
 import type { AnimateLayoutChanges } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { toast } from "sonner";
 import type { Issue, UpdateIssueRequest } from "@multica/core/types";
-import { CalendarClock, CalendarDays } from "lucide-react";
+import { CalendarClock, CalendarDays, CornerLeftUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { ActorAvatar } from "../../common/actor-avatar";
 import { useUpdateIssue } from "@multica/core/issues/mutations";
@@ -26,6 +26,8 @@ import { IssueActionsContextMenu } from "../actions";
 import { LabelChip } from "../../labels/label-chip";
 import { IssueAgentActivityIndicator } from "./issue-agent-activity-indicator";
 import { useT } from "../../i18n";
+import { useRelationshipFocusStore } from "@multica/core/issues/stores/relationship-focus-store";
+import { computeRelatedIds } from "../utils/relationship";
 
 function formatDate(date: string): string {
   return new Date(date).toLocaleDateString("en-US", {
@@ -62,15 +64,20 @@ export const BoardCardContent = memo(function BoardCardContent({
   issue,
   editable = false,
   childProgress,
+  parentIdentifier,
 }: {
   issue: Issue;
   editable?: boolean;
   childProgress?: ChildProgress;
+  parentIdentifier?: string;
 }) {
   const { t } = useT("issues");
   const timeAgo = useTimeAgo();
   const storeProperties = useViewStore((s) => s.cardProperties);
+  const viewMode = useViewStore((s) => s.viewMode);
+  const swimlaneGrouping = useViewStore((s) => s.swimlaneGrouping);
   const wsId = useWorkspaceId();
+  const paths = useWorkspacePaths();
   const { data: projects = [] } = useQuery({
     ...projectListOptions(wsId),
     enabled: storeProperties.project && !!issue.project_id,
@@ -105,6 +112,10 @@ export const BoardCardContent = memo(function BoardCardContent({
   const showProject = storeProperties.project && project;
   const showChildProgress = storeProperties.childProgress && childProgress;
   const showLabels = storeProperties.labels && labels.length > 0;
+  const showParentBadge =
+    storeProperties.parentBadge &&
+    !!issue.parent_issue_id &&
+    !(viewMode === "swimlane" && swimlaneGrouping === "parent");
 
   const showAssigneeName = showAssigneeSection && hasAssignee && !showStartDate && !showDueDate;
   const showUpdatedHint = showAssigneeName && !showChildProgress;
@@ -181,7 +192,7 @@ export const BoardCardContent = memo(function BoardCardContent({
   const showRightMeta = !!showStartDate || !!showDueDate || !!showChildProgress || showUpdatedHint;
 
   return (
-    <div className="rounded-lg border-[0.5px] border-border bg-card py-3 px-2.5 shadow-[0_3px_6px_-2px_rgba(0,0,0,0.02),0_1px_1px_0_rgba(0,0,0,0.04)] transition-colors group-hover/card:border-accent group-hover/card:bg-accent group-data-[popup-open]/card:border-accent group-data-[popup-open]/card:bg-accent">
+    <div className="rounded-lg border-[0.5px] border-border bg-card py-3 px-2.5 shadow-[0_3px_6px_-2px_rgba(0,0,0,0.02),0_1px_1px_0_rgba(0,0,0,0.04)] transition-colors group-hover/card:border-accent group-hover/card:bg-accent group-data-[popup-open]/card:border-accent group-data-[popup-open]/card:bg-accent group-data-[relationship-highlight]/card:ring-2 group-data-[relationship-highlight]/card:ring-primary/50">
       {/* Row 1: priority + identifier (left), agent activity + assignee (right) */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
@@ -206,9 +217,21 @@ export const BoardCardContent = memo(function BoardCardContent({
         );
       })()}
 
-      {/* Chip row: project + labels */}
-      {(showProject || showLabels) && (
+      {/* Chip row: parent badge + project + labels */}
+      {(showParentBadge || showProject || showLabels) && (
         <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+          {showParentBadge && (
+            <AppLink
+              href={paths.issueDetail(issue.parent_issue_id!)}
+              onClick={(e: React.MouseEvent) => e.stopPropagation()}
+              onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+              onPointerDown={(e: React.PointerEvent) => e.stopPropagation()}
+              className="inline-flex items-center gap-0.5 rounded-full bg-muted/60 px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors max-w-[120px]"
+            >
+              <CornerLeftUp className="size-2.5 shrink-0" />
+              <span className="truncate">{parentIdentifier ?? "..."}</span>
+            </AppLink>
+          )}
           {showProject && (
             <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-1.5 py-0.5 text-[11px] text-muted-foreground max-w-[160px]">
               <ProjectIcon project={project} size="sm" />
@@ -312,7 +335,19 @@ const animateLayoutChanges: AnimateLayoutChanges = (args) => {
   return defaultAnimateLayoutChanges(args);
 };
 
-export const DraggableBoardCard = memo(function DraggableBoardCard({ issue, childProgress, disableSorting }: { issue: Issue; childProgress?: ChildProgress; disableSorting?: boolean }) {
+export const DraggableBoardCard = memo(function DraggableBoardCard({
+  issue,
+  childProgress,
+  disableSorting,
+  parentIssueMap,
+  allIssues,
+}: {
+  issue: Issue;
+  childProgress?: ChildProgress;
+  disableSorting?: boolean;
+  parentIssueMap?: Map<string, Issue>;
+  allIssues?: Issue[];
+}) {
   const p = useWorkspacePaths();
   const {
     attributes,
@@ -328,6 +363,31 @@ export const DraggableBoardCard = memo(function DraggableBoardCard({ issue, chil
     disabled: disableSorting ? { droppable: true } : undefined,
   });
 
+  const parentIdentifier = issue.parent_issue_id
+    ? parentIssueMap?.get(issue.parent_issue_id)?.identifier
+    : undefined;
+
+  const allIssuesRef = useRef(allIssues);
+  allIssuesRef.current = allIssues;
+
+  const focusedIssueId = useRelationshipFocusStore((s) => s.focusedIssueId);
+  const relatedIds = useRelationshipFocusStore((s) => s.relatedIds);
+  const isDimmed = focusedIssueId !== null && !relatedIds.has(issue.id);
+  const isHighlighted = focusedIssueId !== null && relatedIds.has(issue.id);
+
+  const handleMouseEnter = useCallback(() => {
+    if (!allIssuesRef.current) return;
+    const related = computeRelatedIds(issue, allIssuesRef.current);
+    if (related.size <= 1) return;
+    useRelationshipFocusStore.getState().setFocus(issue.id, related);
+  }, [issue]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (useRelationshipFocusStore.getState().focusedIssueId === issue.id) {
+      useRelationshipFocusStore.getState().clearFocus();
+    }
+  }, [issue.id]);
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -340,13 +400,16 @@ export const DraggableBoardCard = memo(function DraggableBoardCard({ issue, chil
         style={style}
         {...attributes}
         {...listeners}
-        className={`group/card ${isDragging ? "opacity-30" : ""}`}
+        className={`group/card transition-opacity duration-150 ${isDragging ? "opacity-30" : isDimmed ? "opacity-30" : ""}`}
+        data-relationship-highlight={isHighlighted || undefined}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         <AppLink
           href={p.issueDetail(issue.id)}
           className={`group block transition-colors ${isDragging ? "pointer-events-none" : ""}`}
         >
-          <BoardCardContent issue={issue} editable childProgress={childProgress} />
+          <BoardCardContent issue={issue} editable childProgress={childProgress} parentIdentifier={parentIdentifier} />
         </AppLink>
       </div>
     </IssueActionsContextMenu>

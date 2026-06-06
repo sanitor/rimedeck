@@ -49,6 +49,8 @@ export const BoardColumn = memo(function BoardColumn({
   footer,
   projectId,
   sortLabel,
+  parentIssueMap,
+  allIssues,
 }: {
   group: BoardColumnGroup;
   issueIds: string[];
@@ -59,6 +61,8 @@ export const BoardColumn = memo(function BoardColumn({
   /** When set, the per-column "+" pre-fills the project on the create form. */
   projectId?: string;
   sortLabel?: string | null;
+  parentIssueMap?: Map<string, Issue>;
+  allIssues?: Issue[];
 }) {
   const status = group.status;
   const cfg = status ? STATUS_CONFIG[status] : null;
@@ -143,7 +147,7 @@ export const BoardColumn = memo(function BoardColumn({
         >
           <SortableContext items={issueIds} strategy={verticalListSortingStrategy}>
             {resolvedIssues.map((issue) => (
-              <DraggableBoardCard key={issue.id} issue={issue} childProgress={childProgressMap?.get(issue.id)} disableSorting={!!sortLabel} />
+              <DraggableBoardCard key={issue.id} issue={issue} childProgress={childProgressMap?.get(issue.id)} disableSorting={!!sortLabel} parentIssueMap={parentIssueMap} allIssues={allIssues} />
             ))}
           </SortableContext>
           {issueIds.length === 0 && (

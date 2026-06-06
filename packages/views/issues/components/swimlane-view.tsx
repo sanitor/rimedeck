@@ -44,6 +44,7 @@ import { sortIssues } from "../utils/sort";
 import { BOARD_STATUSES, STATUS_CONFIG } from "@multica/core/issues/config";
 import { useModalStore } from "@multica/core/modals";
 import { DraggableBoardCard, BoardCardContent } from "./board-card";
+import { useRelationshipFocusStore } from "@multica/core/issues/stores/relationship-focus-store";
 import { StatusIcon } from "./status-icon";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@multica/ui/components/ui/tooltip";
 import { Button } from "@multica/ui/components/ui/button";
@@ -797,6 +798,7 @@ export function SwimLaneView({
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     isDraggingRef.current = true;
+    useRelationshipFocusStore.getState().clearFocus();
     const activeId = event.active.id as string;
     // Lane drags don't carry an Issue payload — clear the card overlay so
     // we don't show a stale card during a lane reorder.
@@ -1127,6 +1129,7 @@ export function SwimLaneView({
                 gridStyle={gridStyle}
                 paths={paths}
                 projectId={projectId}
+                allIssues={mergedIssues}
               />
             ))}
           <SortableContext
@@ -1151,6 +1154,7 @@ export function SwimLaneView({
                   gridStyle={gridStyle}
                   paths={paths}
                   projectId={projectId}
+                  allIssues={mergedIssues}
                 />
               ))}
           </SortableContext>
@@ -1210,6 +1214,7 @@ function DraggableSwimLane({
   gridStyle,
   paths,
   projectId,
+  allIssues,
 }: {
   lane: LaneGroup;
   grouping: SwimlaneGrouping;
@@ -1222,6 +1227,7 @@ function DraggableSwimLane({
   gridStyle: React.CSSProperties;
   paths: ReturnType<typeof useWorkspacePaths>;
   projectId?: string;
+  allIssues?: Issue[];
 }) {
   const { t } = useT("issues");
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -1320,6 +1326,7 @@ function DraggableSwimLane({
                 lane={lane}
                 projectId={projectId}
                 readOnly={lane.isOrphan}
+                allIssues={allIssues}
               />
             );
           })}
@@ -1338,6 +1345,7 @@ function SwimLaneCell({
   lane,
   projectId,
   readOnly = false,
+  allIssues,
 }: {
   cellId: string;
   issueIds: string[];
@@ -1353,6 +1361,7 @@ function SwimLaneCell({
    * belong to parents we don't have loaded.
    */
   readOnly?: boolean;
+  allIssues?: Issue[];
 }) {
   // The orphan cell stays enabled in the collision graph so that drops
   // onto its whitespace area are absorbed here instead of falling through
@@ -1396,6 +1405,8 @@ function SwimLaneCell({
               key={issue.id}
               issue={issue}
               childProgress={childProgressMap.get(issue.id)}
+              parentIssueMap={issueMap}
+              allIssues={allIssues}
             />
           ))}
         </SortableContext>

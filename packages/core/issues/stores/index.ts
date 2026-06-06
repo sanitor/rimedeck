@@ -18,6 +18,7 @@ export {
 export { useIssuesScopeStore, type IssuesScope } from "./issues-scope-store";
 export { useCommentCollapseStore } from "./comment-collapse-store";
 export { useCommentDraftStore, type CommentDraftKey } from "./comment-draft-store";
+export { useRelationshipFocusStore } from "./relationship-focus-store";
 export {
   myIssuesViewStore,
   type MyIssuesViewState,
