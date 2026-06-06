@@ -250,7 +250,10 @@ export function AgentCreatePanel({
     () => checkQuickCreateCliVersion(readRuntimeCliVersion(selectedRuntime?.metadata)),
     [selectedRuntime?.metadata],
   );
-  const versionBlocked = versionCheck.state !== "ok";
+  // Skip the version gate when the agent has no runtime (local deployment
+  // where the daemon hasn't registered yet). The server-side check in
+  // QuickCreateIssue handler is the authoritative trust boundary.
+  const versionBlocked = selectedAgent?.runtime_id ? versionCheck.state !== "ok" : false;
 
   const initialPrompt = (data?.prompt as string) || promptDraft;
   // The editor is uncontrolled — we read the latest markdown via the ref at
