@@ -19,6 +19,7 @@ const userRef = vi.hoisted(() => ({
 
 vi.mock("@multica/ui/components/common/theme-provider", () => ({
   useTheme: () => ({ theme: "light", setTheme: vi.fn() }),
+  usePalette: () => ({ palette: "rime", setPalette: vi.fn() }),
 }));
 
 vi.mock("@multica/core/i18n/react", async () => {

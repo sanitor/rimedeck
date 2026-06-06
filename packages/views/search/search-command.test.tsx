@@ -161,6 +161,7 @@ vi.mock("../navigation", () => ({
 
 vi.mock("@multica/ui/components/common/theme-provider", () => ({
   useTheme: () => ({ theme: mockTheme.current, setTheme: mockSetTheme }),
+  usePalette: () => ({ palette: "rime", setPalette: vi.fn() }),
 }));
 
 vi.mock("sonner", () => ({
