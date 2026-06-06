@@ -1,4 +1,9 @@
-/* Multica design tokens — shared across Web + Desktop */
+/* RimeDeck design tokens — shared across Web + Desktop
+ *
+ * Light = "Hoarfrost" (霜凝): frost-blue tinted neutrals (h ≈ 235)
+ * Dark  = "Moonlit Verse" (月韵): deep indigo canvas (h ≈ 250)
+ *
+ * See docs/rimedeck-feature-dev-add-theme.md for rationale. */
 
 @theme inline {
     --font-heading: var(--font-sans);
@@ -51,6 +56,101 @@
 }
 
 :root {
+    --background: oklch(0.982 0.010 230);
+    --foreground: oklch(0.155 0.022 240);
+    --card: oklch(0.988 0.008 230);
+    --card-foreground: oklch(0.155 0.022 240);
+    --popover: oklch(0.988 0.008 230);
+    --popover-foreground: oklch(0.155 0.022 240);
+    --primary: oklch(0.22 0.035 240);
+    --primary-foreground: oklch(0.982 0.008 230);
+    --secondary: oklch(0.950 0.016 230);
+    --secondary-foreground: oklch(0.22 0.035 240);
+    --muted: oklch(0.950 0.016 230);
+    --muted-foreground: oklch(0.50 0.040 235);
+    --accent: oklch(0.938 0.022 225);
+    --accent-foreground: oklch(0.22 0.035 240);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.892 0.022 230);
+    --input: oklch(0.892 0.022 230);
+    --ring: oklch(0.58 0.10 240);
+    /* Hoarfrost chart palette — blue spectrum. chart-1 anchors to the
+       brand blue; trailing series fan toward teal for visual rhythm. */
+    --chart-1: oklch(0.55 0.20 245);
+    --chart-2: oklch(0.62 0.16 230);
+    --chart-3: oklch(0.70 0.12 215);
+    --chart-4: oklch(0.78 0.08 200);
+    --chart-5: oklch(0.86 0.06 185);
+    --radius: 0.625rem;
+    --sidebar: oklch(0.972 0.012 230);
+    --sidebar-foreground: oklch(0.155 0.022 240);
+    --sidebar-primary: oklch(0.22 0.035 240);
+    --sidebar-primary-foreground: oklch(0.982 0.008 230);
+    --sidebar-accent: oklch(0.938 0.018 230);
+    --sidebar-accent-foreground: oklch(0.22 0.035 240);
+    --sidebar-border: oklch(0.892 0.022 230);
+    --sidebar-ring: oklch(0.58 0.10 240);
+    --brand: oklch(0.55 0.22 250);
+    --brand-foreground: oklch(0.985 0.006 230);
+    --success: oklch(0.55 0.16 152);
+    --warning: oklch(0.75 0.16 85);
+    --info: oklch(0.55 0.20 240);
+    --scrollbar-thumb: oklch(0.45 0.06 235 / 14%);
+    --scrollbar-thumb-hover: oklch(0.45 0.06 235 / 22%);
+    --scrollbar-track: transparent;
+}
+
+.dark {
+    --background: oklch(0.165 0.028 260);
+    --foreground: oklch(0.965 0.010 230);
+    --card: oklch(0.195 0.032 258);
+    --card-foreground: oklch(0.965 0.010 230);
+    --popover: oklch(0.195 0.032 258);
+    --popover-foreground: oklch(0.965 0.010 230);
+    --primary: oklch(0.905 0.016 235);
+    --primary-foreground: oklch(0.195 0.032 258);
+    --secondary: oklch(0.252 0.030 258);
+    --secondary-foreground: oklch(0.965 0.010 230);
+    --muted: oklch(0.252 0.030 258);
+    --muted-foreground: oklch(0.65 0.032 235);
+    --accent: oklch(0.265 0.035 252);
+    --accent-foreground: oklch(0.965 0.010 230);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(0.55 0.06 250 / 15%);
+    --input: oklch(0.55 0.06 250 / 20%);
+    --ring: oklch(0.70 0.16 55);
+    /* Moonlit Verse chart palette — warm hue rotation on the dark indigo
+       canvas. Orange anchors the primary series; trailing series step
+       through the warm spectrum (55 → 40 → 25 → 10 → 350). */
+    --chart-1: oklch(0.72 0.18 55);
+    --chart-2: oklch(0.65 0.15 40);
+    --chart-3: oklch(0.58 0.12 25);
+    --chart-4: oklch(0.50 0.10 10);
+    --chart-5: oklch(0.42 0.08 350);
+    --sidebar: oklch(0.185 0.032 258);
+    --sidebar-foreground: oklch(0.965 0.010 230);
+    --sidebar-primary: oklch(0.70 0.18 55);
+    --sidebar-primary-foreground: oklch(0.15 0.02 55);
+    --sidebar-accent: oklch(0.252 0.030 258);
+    --sidebar-accent-foreground: oklch(0.965 0.010 230);
+    --sidebar-border: oklch(0.55 0.06 250 / 15%);
+    --sidebar-ring: oklch(0.70 0.16 55);
+    --brand: oklch(0.70 0.18 55);
+    --brand-foreground: oklch(0.15 0.02 55);
+    --success: oklch(0.65 0.15 152);
+    --warning: oklch(0.72 0.16 85);
+    --info: oklch(0.65 0.18 245);
+    --scrollbar-thumb: oklch(0.55 0.06 250 / 12%);
+    --scrollbar-thumb-hover: oklch(0.55 0.06 250 / 22%);
+    --scrollbar-track: transparent;
+}
+
+/* ── Zinc Classic palette override ─────────────────────────────────────
+ * When [data-palette="zinc"] is set on <html>, these restore the original
+ * neutral zinc palette (h ≈ 286, near-zero chroma). The rime palette
+ * (above) is the default — no data attribute needed. */
+
+:root[data-palette="zinc"] {
     --background: oklch(1 0 0);
     --foreground: oklch(0.141 0.005 285.823);
     --card: oklch(1 0 0);
@@ -69,17 +169,11 @@
     --border: oklch(0.92 0.004 286.32);
     --input: oklch(0.92 0.004 286.32);
     --ring: oklch(0.705 0.015 286.067);
-    /* Brand-derived blue gradient (h=255 = brand hue). chart-1 equals brand
-       so the most important series visually anchors to the product colour;
-       chart-2..5 step lighter + less saturated so a stacked bar reads
-       "primary → secondary → tertiary" at a glance instead of fighting
-       for attention as five equally-weighted greys. */
     --chart-1: oklch(0.55 0.16 255);
     --chart-2: oklch(0.66 0.13 255);
     --chart-3: oklch(0.76 0.10 255);
     --chart-4: oklch(0.85 0.06 255);
     --chart-5: oklch(0.92 0.03 255);
-    --radius: 0.625rem;
     --sidebar: oklch(0.985 0 0);
     --sidebar-foreground: oklch(0.141 0.005 285.823);
     --sidebar-primary: oklch(0.21 0.006 285.885);
@@ -98,7 +192,8 @@
     --scrollbar-track: transparent;
 }
 
-.dark {
+.dark[data-palette="zinc"],
+[data-palette="zinc"] .dark {
     --background: oklch(0.18 0.005 285.823);
     --foreground: oklch(0.985 0 0);
     --card: oklch(0.21 0.006 285.885);
@@ -117,10 +212,6 @@
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
     --ring: oklch(0.552 0.016 285.938);
-    /* Dark mode mirrors light mode's "primary → secondary" gradient on the
-       brand hue, but flips the lightness curve: the most important series
-       is the brightest (so it pops on the dark background) and trailing
-       series get progressively darker / less saturated. */
     --chart-1: oklch(0.72 0.16 255);
     --chart-2: oklch(0.62 0.13 255);
     --chart-3: oklch(0.52 0.10 255);

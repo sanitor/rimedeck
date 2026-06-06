@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@multica/ui/components/ui/select";
-import { useTheme } from "@multica/ui/components/common/theme-provider";
+import { useTheme, usePalette, type Palette } from "@multica/ui/components/common/theme-provider";
 import { cn } from "@multica/ui/lib/utils";
 import {
   DEFAULT_LOCALE,
@@ -22,21 +22,43 @@ import { api } from "@multica/core/api";
 import { browserTimezone, timezoneOptions } from "../../common/timezone-select";
 import { useT } from "../../i18n";
 
-const LIGHT_COLORS = {
-  titleBar: "#e8e8e8",
-  content: "#ffffff",
-  sidebar: "#f4f4f5",
-  bar: "#e4e4e7",
-  barMuted: "#d4d4d8",
-};
+const PALETTE_COLORS = {
+  rime: {
+    light: {
+      titleBar: "#d0daf0",
+      content: "#ebf0fa",
+      sidebar: "#dce4f4",
+      bar: "#4a6cc8",
+      barMuted: "#b0bdd8",
+    },
+    dark: {
+      titleBar: "#1e2048",
+      content: "#16183a",
+      sidebar: "#11132e",
+      bar: "#d4833a",
+      barMuted: "#353862",
+    },
+  },
+  zinc: {
+    light: {
+      titleBar: "#e8e8e8",
+      content: "#ffffff",
+      sidebar: "#f4f4f5",
+      bar: "#e4e4e7",
+      barMuted: "#d4d4d8",
+    },
+    dark: {
+      titleBar: "#333338",
+      content: "#27272a",
+      sidebar: "#1e1e21",
+      bar: "#3f3f46",
+      barMuted: "#52525b",
+    },
+  },
+} as const;
 
-const DARK_COLORS = {
-  titleBar: "#333338",
-  content: "#27272a",
-  sidebar: "#1e1e21",
-  bar: "#3f3f46",
-  barMuted: "#52525b",
-};
+const LIGHT_COLORS = PALETTE_COLORS.rime.light;
+const DARK_COLORS = PALETTE_COLORS.rime.dark;
 
 function WindowMockup({
   variant,
@@ -97,8 +119,86 @@ function WindowMockup({
   );
 }
 
+function PaletteMockup({
+  palette,
+  className,
+}: {
+  palette: Palette;
+  className?: string;
+}) {
+  const light = PALETTE_COLORS[palette].light;
+  const dark = PALETTE_COLORS[palette].dark;
+
+  return (
+    <div className={cn("flex h-full w-full", className)}>
+      {/* Light half */}
+      <div className="flex w-1/2 flex-col">
+        <div
+          className="flex items-center gap-[3px] px-2 py-1.5"
+          style={{ backgroundColor: light.titleBar }}
+        >
+          <span className="size-[6px] rounded-full bg-[#ff5f57]" />
+          <span className="size-[6px] rounded-full bg-[#febc2e]" />
+          <span className="size-[6px] rounded-full bg-[#28c840]" />
+        </div>
+        <div
+          className="flex flex-1"
+          style={{ backgroundColor: light.content }}
+        >
+          <div
+            className="w-[30%] space-y-1 p-2"
+            style={{ backgroundColor: light.sidebar }}
+          >
+            <div
+              className="h-1 w-3/4 rounded-full"
+              style={{ backgroundColor: light.bar }}
+            />
+            <div
+              className="h-1 w-1/2 rounded-full"
+              style={{ backgroundColor: light.bar }}
+            />
+          </div>
+          <div className="flex-1 space-y-1.5 p-2">
+            <div
+              className="h-1.5 w-4/5 rounded-full"
+              style={{ backgroundColor: light.bar }}
+            />
+            <div
+              className="h-1 w-full rounded-full"
+              style={{ backgroundColor: light.barMuted }}
+            />
+          </div>
+        </div>
+      </div>
+      {/* Dark half */}
+      <div className="flex w-1/2 flex-col">
+        <div
+          className="flex items-center justify-end gap-[3px] px-2 py-1.5"
+          style={{ backgroundColor: dark.titleBar }}
+        />
+        <div
+          className="flex flex-1"
+          style={{ backgroundColor: dark.content }}
+        >
+          <div className="flex-1 space-y-1.5 p-2">
+            <div
+              className="h-1.5 w-4/5 rounded-full"
+              style={{ backgroundColor: dark.bar }}
+            />
+            <div
+              className="h-1 w-full rounded-full"
+              style={{ backgroundColor: dark.barMuted }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function PreferencesTab() {
   const { theme, setTheme } = useTheme();
+  const { palette, setPalette } = usePalette();
   const { t, i18n } = useT("settings");
   const localeAdapter = useLocaleAdapter();
   const user = useAuthStore((s) => s.user);
@@ -116,6 +216,19 @@ export function PreferencesTab() {
     { value: "light" as const, label: t(($) => $.preferences.theme.light) },
     { value: "dark" as const, label: t(($) => $.preferences.theme.dark) },
     { value: "system" as const, label: t(($) => $.preferences.theme.system) },
+  ];
+
+  const paletteOptions: { value: Palette; label: string; description: string }[] = [
+    {
+      value: "rime",
+      label: t(($) => $.preferences.palette.rime),
+      description: t(($) => $.preferences.palette.rime_description),
+    },
+    {
+      value: "zinc",
+      label: t(($) => $.preferences.palette.zinc),
+      description: t(($) => $.preferences.palette.zinc_description),
+    },
   ];
 
   const languageOptions: { value: SupportedLocale; label: string }[] = [
@@ -207,6 +320,53 @@ export function PreferencesTab() {
                 >
                   {opt.label}
                 </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-sm font-semibold">
+          {t(($) => $.preferences.palette.title)}
+        </h2>
+        <div className="flex gap-6" role="radiogroup">
+          {paletteOptions.map((opt) => {
+            const active = palette === opt.value;
+            return (
+              <button
+                type="button"
+                key={opt.value}
+                role="radio"
+                aria-checked={active}
+                onClick={() => setPalette(opt.value)}
+                className="group flex flex-col items-center gap-2"
+              >
+                <div
+                  className={cn(
+                    "aspect-[4/3] w-36 overflow-hidden rounded-lg ring-1 transition-all",
+                    active
+                      ? "ring-2 ring-brand"
+                      : "ring-border hover:ring-2 hover:ring-border"
+                  )}
+                >
+                  <PaletteMockup palette={opt.value} />
+                </div>
+                <div className="flex flex-col items-center">
+                  <span
+                    className={cn(
+                      "text-sm transition-colors",
+                      active
+                        ? "font-medium text-foreground"
+                        : "text-muted-foreground"
+                    )}
+                  >
+                    {opt.label}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {opt.description}
+                  </span>
+                </div>
               </button>
             );
           })}

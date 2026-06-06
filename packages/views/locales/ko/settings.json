@@ -6,6 +6,13 @@
       "dark": "다크",
       "system": "시스템"
     },
+    "palette": {
+      "title": "색상 팔레트",
+      "rime": "서리빛",
+      "rime_description": "서리 블루 색조",
+      "zinc": "클래식 그레이",
+      "zinc_description": "뉴트럴 그레이"
+    },
     "language": {
       "title": "언어",
       "english": "English",

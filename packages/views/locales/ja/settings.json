@@ -6,6 +6,13 @@
       "dark": "ダーク",
       "system": "システム"
     },
+    "palette": {
+      "title": "カラーパレット",
+      "rime": "霜凝",
+      "rime_description": "フロストブルー",
+      "zinc": "クラシックグレー",
+      "zinc_description": "ニュートラルグレー"
+    },
     "language": {
       "title": "言語",
       "english": "English",

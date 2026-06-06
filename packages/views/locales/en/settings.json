@@ -6,6 +6,13 @@
       "dark": "Dark",
       "system": "System"
     },
+    "palette": {
+      "title": "Color Palette",
+      "rime": "Hoarfrost",
+      "rime_description": "Frost-blue tinted",
+      "zinc": "Zinc Classic",
+      "zinc_description": "Neutral gray"
+    },
     "language": {
       "title": "Language",
       "english": "English",
