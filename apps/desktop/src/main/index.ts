@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeImage, Notification } from "electron";
 import { homedir } from "os";
 import { join } from "path";
+import { readFile, writeFile, rm } from "fs/promises";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import fixPath from "fix-path";
 import { setupAutoUpdater } from "./updater";
@@ -76,6 +77,29 @@ if (process.platform === "win32") {
 }
 
 const PROTOCOL = "rimedeck";
+const REMOTE_CONNECTION_PATH = join(homedir(), ".rimedeck", "remote_connection.json");
+
+interface RemoteConnection {
+  apiUrl: string;
+  wsUrl: string;
+}
+
+async function loadRemoteConnection(): Promise<RemoteConnection | null> {
+  try {
+    const raw = await readFile(REMOTE_CONNECTION_PATH, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (parsed.apiUrl && parsed.wsUrl) return parsed;
+  } catch { /* file doesn't exist or invalid */ }
+  return null;
+}
+
+async function saveRemoteConnection(conn: RemoteConnection | null): Promise<void> {
+  if (conn) {
+    await writeFile(REMOTE_CONNECTION_PATH, JSON.stringify(conn, null, 2));
+  } else {
+    await rm(REMOTE_CONNECTION_PATH, { force: true });
+  }
+}
 
 let mainWindow: BrowserWindow | null = null;
 let runtimeConfigResult: RuntimeConfigResult = {
@@ -353,17 +377,36 @@ if (!gotTheLock) {
 
     showSplash(BUNDLED_ICON_PATH);
 
+    // Check for a persisted remote connection FIRST. If present, the
+    // renderer targets the remote server directly and the local backend
+    // is still started (it hosts the daemon health endpoint + log stream)
+    // but doesn't become the API source.
+    const savedRemote = await loadRemoteConnection();
+
     try {
       const localBackend = await setupLocalBackend(updateSplashStatus);
-      runtimeConfigResult = {
-        ok: true,
-        config: {
-          schemaVersion: 1,
-          apiUrl: localBackend.apiUrl,
-          wsUrl: localBackend.wsUrl,
-          appUrl: localBackend.apiUrl,
-        },
-      };
+      if (savedRemote) {
+        runtimeConfigResult = {
+          ok: true,
+          config: {
+            schemaVersion: 1,
+            apiUrl: savedRemote.apiUrl,
+            wsUrl: savedRemote.wsUrl,
+            appUrl: savedRemote.apiUrl,
+          },
+        };
+        console.log(`[main] Restored remote connection: ${savedRemote.apiUrl}`);
+      } else {
+        runtimeConfigResult = {
+          ok: true,
+          config: {
+            schemaVersion: 1,
+            apiUrl: localBackend.apiUrl,
+            wsUrl: localBackend.wsUrl,
+            appUrl: localBackend.apiUrl,
+          },
+        };
+      }
     } catch (err) {
       console.error("[main] Local backend startup failed:", err);
       runtimeConfigResult = {
@@ -426,21 +469,24 @@ if (!gotTheLock) {
 
     ipcMain.handle(
       "runtime-config:switch",
-      (_event, config: { apiUrl: string; wsUrl: string }) => {
+      async (_event, config: { apiUrl: string; wsUrl: string }) => {
+        const wsUrl = config.apiUrl.replace(/^http/, "ws") + "/ws";
         runtimeConfigResult = {
           ok: true,
           config: {
             schemaVersion: 1,
             apiUrl: config.apiUrl,
-            wsUrl: config.apiUrl.replace(/^http/, "ws") + "/ws",
+            wsUrl,
             appUrl: config.apiUrl,
           },
         };
+        await saveRemoteConnection({ apiUrl: config.apiUrl, wsUrl });
         mainWindow?.webContents.send("runtime-config:changed", runtimeConfigResult);
       },
     );
 
-    ipcMain.handle("runtime-config:disconnect", () => {
+    ipcMain.handle("runtime-config:disconnect", async () => {
+      await saveRemoteConnection(null);
       if (localBackendConfig) {
         runtimeConfigResult = {
           ok: true,
