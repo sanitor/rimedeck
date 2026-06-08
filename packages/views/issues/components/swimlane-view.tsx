@@ -57,7 +57,7 @@ import { ActorAvatar } from "../../common/actor-avatar";
 import type { ChildProgress } from "./list-row";
 import { useT } from "../../i18n";
 
-const COLUMN_WIDTH = 280;
+const COLUMN_WIDTH = 260;
 const COLUMN_GAP = 16;
 
 // Hoisted out of SwimLaneView so its reference is stable across renders —
@@ -1179,7 +1179,7 @@ export function SwimLaneView({
 
       <DragOverlay dropAnimation={null}>
         {activeIssue ? (
-          <div className="w-[280px] rotate-2 scale-105 cursor-grabbing opacity-90 shadow-lg shadow-black/10">
+          <div className="w-[260px] rotate-2 scale-105 cursor-grabbing opacity-90 shadow-lg shadow-black/10">
             <BoardCardContent issue={activeIssue} childProgress={childProgressMap.get(activeIssue.id)} />
           </div>
         ) : null}

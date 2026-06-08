@@ -27,8 +27,8 @@ import { ActorAvatar } from "../../common/actor-avatar";
 // cannot be faithfully replicated in JavaScript (ICU/V8). Showing an
 // inaccurate indicator is worse than showing none.
 
-export const BOARD_COL_WIDTH = 280;
-export const BOARD_CARD_WIDTH = BOARD_COL_WIDTH - 16 - 8; // col(280) - col p-2(16) - droppable p-1(8)
+export const BOARD_COL_WIDTH = 260;
+export const BOARD_CARD_WIDTH = BOARD_COL_WIDTH - 16 - 8; // col(240) - col p-2(16) - droppable p-1(8)
 
 export interface BoardColumnGroup {
   id: string;
