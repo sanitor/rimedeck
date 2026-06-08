@@ -26,6 +26,7 @@
     "unpin_tooltip": "ピン留めを解除",
     "workspaces_label": "ワークスペース",
     "create_workspace": "ワークスペースを作成",
+    "join_workspace": "ワークスペースに参加",
     "pending_invitations_label": "保留中の招待",
     "invitation_workspace_fallback": "ワークスペース",
     "invitation_join": "参加",

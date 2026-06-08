@@ -4,6 +4,7 @@
     "tagline": "에이전트의 CLI 세션을 실행하는 기기와 클라우드 워커입니다.",
     "learn_more": "자세히 보기 →",
     "connect_remote": "컴퓨터 추가",
+    "connect_to_server": "서버에 연결",
     "search_placeholder": "런타임 검색...",
     "scope_mine": "내 것",
     "scope_all": "전체",
@@ -169,11 +170,16 @@
   "connect": {
     "title": "컴퓨터 추가",
     "description": "추가하려는 컴퓨터에서 아래 두 명령을 실행하세요. 데몬이 온라인이 되는 순간 감지합니다.",
+    "description_desktop": "아래 주소와 페어링 코드를 상대 컴퓨터에 알려주세요. 상대방이 RimeDeck Desktop에서 입력하면 연결됩니다.",
     "step1_label": "RimeDeck CLI 설치",
-    "step2_label": "데몬 시작",
+    "step2_label": "데몬 설정",
     "step2_hint": "로그인을 위해 브라우저를 열고, 이후 데몬을 백그라운드에서 계속 실행합니다.",
-    "live_listening": "컴퓨터를 기다리는 중",
-    "live_listening_hint": "데몬이 시작되면 바로 감지합니다. 보통 1분 이내입니다.",
+    "desktop_steps": "상대 컴퓨터에서: RimeDeck 열기 → 런타임 → 서버에 연결 → 위의 주소와 페어링 코드 입력.",
+    "live_listening": "연결 대기 중",
+    "live_listening_hint": "상대가 연결하면 자동으로 감지합니다.",
+    "cli_fallback_title": "Desktop 없이 헤드리스 서버를 연결하려면?",
+    "cli_fallback_hint": "원격 머신에 RimeDeck Desktop이 없는 경우(예: 헤드리스 GPU 서버) 아래 CLI 명령을 실행하세요.",
+    "cli_token_label": "대안: 토큰 로그인",
     "troubleshooting": "해당 컴퓨터에서 브라우저를 열 수 없나요?",
     "trouble_intro": "브라우저 로그인 대신 토큰을 사용하세요. 2단계를 대체하며 터미널이 있는 곳이면 어디서든 작동합니다.",
     "trouble_token_hint_prefix": "토큰은 ",
@@ -181,6 +187,7 @@
     "trouble_token_hint_suffix": "에서 만들 수 있습니다. 데몬은 외부로만 연결하므로 인바운드 포트가 필요 없습니다.",
     "trouble_check_status": "상태 확인",
     "trouble_view_logs": "로그 보기",
+    "pairing_code_label": "페어링 코드",
     "copy_aria": "복사",
     "cancel": "취소",
     "success_title": "컴퓨터 연결됨",
@@ -326,5 +333,21 @@
     "table_cache_r": "캐시 R",
     "table_cache_w": "캐시 W",
     "no_data": "아직 사용량 데이터가 없습니다"
+  },
+  "server_address": {
+    "title": "서버 주소",
+    "tailscale_hint": "다른 네트워크에서 연결할 때 Tailscale 주소를 사용하세요."
+  },
+  "connect_to_server": {
+    "title": "서버에 연결",
+    "description": "상대 컴퓨터의 RimeDeck Desktop에 표시된 주소와 페어링 코드를 입력하세요.",
+    "server_url_label": "서버 주소",
+    "pairing_code_label": "페어링 코드",
+    "connect": "연결",
+    "connecting": "연결 중…",
+    "cancel": "취소",
+    "done": "완료",
+    "success_title": "연결됨",
+    "success_description": "이 컴퓨터가 원격 서버에 연결되어 연산 능력을 제공하고 있습니다."
   }
 }

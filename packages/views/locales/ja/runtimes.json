@@ -4,6 +4,7 @@
     "tagline": "エージェントの CLI セッションを実行するマシンとクラウドワーカーです。",
     "learn_more": "詳しく見る →",
     "connect_remote": "コンピュータを追加",
+    "connect_to_server": "サーバーに接続",
     "search_placeholder": "ランタイムを検索…",
     "scope_mine": "自分のもの",
     "scope_all": "すべて",
@@ -157,11 +158,16 @@
   "connect": {
     "title": "コンピュータを追加",
     "description": "追加したいコンピュータで、この 2 つのコマンドを実行してください。デーモンがオンラインになった瞬間に検出します。",
+    "description_desktop": "以下のアドレスとペアリングコードを相手のコンピュータに伝えてください。相手がRimeDeck Desktopで入力すると接続されます。",
     "step1_label": "RimeDeck CLI をインストール",
-    "step2_label": "デーモンを起動",
+    "step2_label": "デーモンを設定",
     "step2_hint": "サインインのためにブラウザを開き、その後デーモンをバックグラウンドで実行し続けます。",
-    "live_listening": "あなたのコンピュータを待っています",
-    "live_listening_hint": "デーモンが起動するとすぐに検出します — 通常は 1 分以内です。",
+    "desktop_steps": "相手のコンピュータで：RimeDeck を開く → ランタイム → サーバーに接続 → 上のアドレスとペアリングコードを入力。",
+    "live_listening": "接続待機中",
+    "live_listening_hint": "相手が接続すると自動で検出します。",
+    "cli_fallback_title": "Desktopなしでヘッドレスサーバーを接続しますか？",
+    "cli_fallback_hint": "リモートマシンにRimeDeck Desktopがない場合（例：ヘッドレスGPUサーバー）、以下のCLIコマンドを実行してください。",
+    "cli_token_label": "代替：トークンログイン",
     "troubleshooting": "そのコンピュータでブラウザを開けませんか?",
     "trouble_intro": "ブラウザでのサインインの代わりにトークンを使ってください。手順 2 を置き換え、ターミナルがある場所ならどこでも動作します。",
     "trouble_token_hint_prefix": "トークンは ",
@@ -169,6 +175,7 @@
     "trouble_token_hint_suffix": " で作成できます。デーモンは外向きの接続のみを行うため、インバウンドポートは不要です。",
     "trouble_check_status": "ステータスを確認",
     "trouble_view_logs": "ログを表示",
+    "pairing_code_label": "ペアリングコード",
     "copy_aria": "コピー",
     "cancel": "キャンセル",
     "success_title": "コンピュータを接続しました",
@@ -311,5 +318,21 @@
     "table_cache_r": "キャッシュ R",
     "table_cache_w": "キャッシュ W",
     "no_data": "まだ使用量データがありません"
+  },
+  "server_address": {
+    "title": "サーバーアドレス",
+    "tailscale_hint": "別のネットワークから接続する場合はTailscaleアドレスを使用してください。"
+  },
+  "connect_to_server": {
+    "title": "サーバーに接続",
+    "description": "相手のコンピュータのRimeDeck Desktopに表示されているアドレスとペアリングコードを入力してください。",
+    "server_url_label": "サーバーアドレス",
+    "pairing_code_label": "ペアリングコード",
+    "connect": "接続",
+    "connecting": "接続中…",
+    "cancel": "キャンセル",
+    "done": "完了",
+    "success_title": "接続しました",
+    "success_description": "このコンピュータがリモートサーバーに接続され、計算リソースを提供しています。"
   }
 }
