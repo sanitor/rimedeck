@@ -114,12 +114,47 @@ func (h *Handler) DevicePair(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Info("device paired", "device_name", req.DeviceName, "workspace_id", uuidToString(wsUUID))
-
-	writeJSON(w, http.StatusOK, DevicePairResponse{
-		Token:       rawToken,
-		WorkspaceID: uuidToString(wsUUID),
+	// Create a local user for the paired device so the frontend has a
+	// session to authenticate with. Mirrors the RedeemInvitation flow.
+	deviceName := strings.TrimSpace(req.DeviceName)
+	if deviceName == "" {
+		deviceName = "Paired Device"
+	}
+	placeholderEmail := fmt.Sprintf("paired-%s@local.rimedeck", rawToken[4:12])
+	user, err := h.Queries.CreateUser(r.Context(), db.CreateUserParams{
+		Name:  deviceName,
+		Email: placeholderEmail,
 	})
+	if err != nil {
+		if isUniqueViolation(err) {
+			user, err = h.Queries.GetUserByEmail(r.Context(), placeholderEmail)
+		}
+		if err != nil {
+			slog.Warn("device pair: create user failed (non-fatal)", "error", err)
+		}
+	}
+	if user.ID.Valid {
+		// Add as workspace member
+		_, _ = h.Queries.CreateMember(r.Context(), db.CreateMemberParams{
+			WorkspaceID: wsUUID,
+			UserID:      user.ID,
+			Role:        "member",
+		})
+		_, _ = h.Queries.MarkUserOnboarded(r.Context(), user.ID)
+	}
+
+	slog.Info("device paired", "device_name", deviceName, "workspace_id", uuidToString(wsUUID))
+
+	resp := map[string]any{
+		"token":        rawToken,
+		"workspace_id": uuidToString(wsUUID),
+	}
+	if user.ID.Valid {
+		if jwtToken, err := h.issueJWT(user); err == nil {
+			resp["jwt"] = jwtToken
+		}
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // issueDaemonToken generates a daemon token for the given workspace.

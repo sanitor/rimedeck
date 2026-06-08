@@ -692,5 +692,8 @@ func (h *Handler) RedeemInvitation(w http.ResponseWriter, r *http.Request) {
 	if daemonToken != "" {
 		resp["token"] = daemonToken
 	}
+	if jwtToken, err := h.issueJWT(user); err == nil {
+		resp["jwt"] = jwtToken
+	}
 	writeJSON(w, http.StatusOK, resp)
 }

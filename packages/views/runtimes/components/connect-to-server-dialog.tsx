@@ -60,7 +60,12 @@ export function ConnectToServerDialog({ onClose }: { onClose: () => void }) {
         );
       }
 
-      const data: { token: string; workspace_id: string } = await res.json();
+      const data: { token: string; jwt?: string; workspace_id: string } = await res.json();
+
+      // Store the JWT so the frontend can authenticate after reload.
+      if (data.jwt) {
+        localStorage.setItem("multica_token", data.jwt);
+      }
 
       // 1. Switch the renderer's API/WS URLs to the remote server.
       const desktopAPI = (window as unknown as Record<string, unknown>).desktopAPI as

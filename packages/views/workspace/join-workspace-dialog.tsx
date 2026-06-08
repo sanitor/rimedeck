@@ -44,22 +44,34 @@ export function JoinWorkspaceDialog({ onClose }: { onClose: () => void }) {
       let hostName = "";
       try { hostName = (await daemonAPI?.getHostName?.()) ?? ""; } catch { /* ignore */ }
 
-      // Redeem the invite code on the remote server.
-      const redeemRes = await fetch(`${url}/api/invitations/redeem`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: inviteCode.trim().toUpperCase(),
-          device_name: hostName,
-        }),
-      });
+      // Try the code as an invitation first, then as a pairing code.
+      const code = inviteCode.trim().toUpperCase();
+      const headers = { "Content-Type": "application/json" };
+      const body = JSON.stringify({ code, device_name: hostName });
 
-      if (!redeemRes.ok) {
-        const body = await redeemRes.text().catch(() => "");
-        throw new Error(body || `${redeemRes.status} ${redeemRes.statusText}`);
+      let data: { token?: string; jwt?: string; workspace_id: string };
+
+      const redeemRes = await fetch(`${url}/api/invitations/redeem`, {
+        method: "POST", headers, body,
+      });
+      if (redeemRes.ok) {
+        data = await redeemRes.json();
+      } else {
+        // Invitation failed — try pairing code.
+        const pairRes = await fetch(`${url}/api/auth/pair`, {
+          method: "POST", headers, body,
+        });
+        if (!pairRes.ok) {
+          const errBody = await pairRes.text().catch(() => "");
+          throw new Error(errBody || `${pairRes.status} ${pairRes.statusText}`);
+        }
+        data = await pairRes.json();
       }
 
-      const data: { token?: string; workspace_id: string } = await redeemRes.json();
+      // Store the JWT so the frontend can authenticate after reload.
+      if (data.jwt) {
+        localStorage.setItem("multica_token", data.jwt);
+      }
 
       // 1. Switch the renderer's API/WS URLs to the remote server.
       const desktopAPI = (window as unknown as Record<string, unknown>).desktopAPI as
