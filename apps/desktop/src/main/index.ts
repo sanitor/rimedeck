@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeImage, Notification } from "electron";
 import { homedir } from "os";
 import { join } from "path";
+import { readFileSync, writeFileSync, mkdirSync, unlinkSync } from "fs";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import fixPath from "fix-path";
 import { setupAutoUpdater } from "./updater";
@@ -76,6 +77,27 @@ if (process.platform === "win32") {
 }
 
 const PROTOCOL = "rimedeck";
+const REMOTE_CONFIG_PATH = join(homedir(), ".rimedeck", "remote_connection.json");
+
+function loadRemoteConfig(): { apiUrl: string; wsUrl: string } | null {
+  try {
+    const raw = readFileSync(REMOTE_CONFIG_PATH, "utf-8");
+    const obj = JSON.parse(raw);
+    if (obj.apiUrl && obj.wsUrl) return obj;
+  } catch { /* not found or invalid */ }
+  return null;
+}
+
+function saveRemoteConfig(config: { apiUrl: string; wsUrl: string } | null): void {
+  try {
+    if (config) {
+      mkdirSync(join(homedir(), ".rimedeck"), { recursive: true });
+      writeFileSync(REMOTE_CONFIG_PATH, JSON.stringify(config));
+    } else {
+      unlinkSync(REMOTE_CONFIG_PATH);
+    }
+  } catch { /* best effort */ }
+}
 
 let mainWindow: BrowserWindow | null = null;
 let runtimeConfigResult: RuntimeConfigResult = {
@@ -353,17 +375,22 @@ if (!gotTheLock) {
 
     showSplash(BUNDLED_ICON_PATH);
 
+    const savedRemote = loadRemoteConfig();
+    let localBackendUrls: { apiUrl: string; wsUrl: string } | null = null;
     try {
       const localBackend = await setupLocalBackend(updateSplashStatus);
+      localBackendUrls = localBackend;
+      const target = savedRemote ?? localBackend;
       runtimeConfigResult = {
         ok: true,
         config: {
           schemaVersion: 1,
-          apiUrl: localBackend.apiUrl,
-          wsUrl: localBackend.wsUrl,
-          appUrl: localBackend.apiUrl,
+          apiUrl: target.apiUrl,
+          wsUrl: target.wsUrl,
+          appUrl: target.apiUrl,
         },
       };
+      if (savedRemote) console.log(`[main] restored remote: ${savedRemote.apiUrl}`);
     } catch (err) {
       console.error("[main] Local backend startup failed:", err);
       runtimeConfigResult = {
@@ -416,31 +443,28 @@ if (!gotTheLock) {
     });
 
     // IPC: switch the runtime config to a remote server or back to local.
-    let localBackendConfig: { apiUrl: string; wsUrl: string } | null = null;
-    if (runtimeConfigResult.ok) {
-      localBackendConfig = {
-        apiUrl: runtimeConfigResult.config.apiUrl,
-        wsUrl: runtimeConfigResult.config.wsUrl,
-      };
-    }
+    const localBackendConfig = localBackendUrls;
 
     ipcMain.handle(
       "runtime-config:switch",
       (_event, config: { apiUrl: string; wsUrl: string }) => {
+        const wsUrl = config.apiUrl.replace(/^http/, "ws") + "/ws";
         runtimeConfigResult = {
           ok: true,
           config: {
             schemaVersion: 1,
             apiUrl: config.apiUrl,
-            wsUrl: config.apiUrl.replace(/^http/, "ws") + "/ws",
+            wsUrl,
             appUrl: config.apiUrl,
           },
         };
+        saveRemoteConfig({ apiUrl: config.apiUrl, wsUrl });
         mainWindow?.webContents.send("runtime-config:changed", runtimeConfigResult);
       },
     );
 
     ipcMain.handle("runtime-config:disconnect", () => {
+      saveRemoteConfig(null);
       if (localBackendConfig) {
         runtimeConfigResult = {
           ok: true,
