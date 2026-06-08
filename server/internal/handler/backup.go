@@ -445,15 +445,15 @@ func (h *Handler) ImportBackup(w http.ResponseWriter, r *http.Request) {
 		}
 
 		rc := ba.RuntimeConfig
-		if rc == nil {
+		if len(rc) == 0 || string(rc) == "null" {
 			rc = json.RawMessage("{}")
 		}
 		ca := ba.CustomArgs
-		if ca == nil {
+		if len(ca) == 0 || string(ca) == "null" {
 			ca = json.RawMessage("[]")
 		}
 		var mc []byte
-		if ba.McpConfig != nil {
+		if len(ba.McpConfig) > 0 && string(ba.McpConfig) != "null" {
 			mc = ba.McpConfig
 		}
 		mct := int32(6)
