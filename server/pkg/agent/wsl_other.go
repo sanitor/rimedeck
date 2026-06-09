@@ -24,6 +24,3 @@ func wslCommand(ctx context.Context, execPath string, args []string, cwd string,
 func wslDetectVersion(ctx context.Context, execPath string) (string, error) {
 	return "", fmt.Errorf("WSL is not available on this platform")
 }
-
-// windowsToWSLPath is a passthrough on non-Windows.
-func windowsToWSLPath(winPath string) string { return winPath }
