@@ -1023,6 +1023,41 @@ export function setupDaemonManager(
   ipcMain.handle("daemon:stop", () => withGuard(() => stopDaemon()));
   ipcMain.handle("daemon:restart", () => withGuard(() => restartDaemon()));
   ipcMain.handle("daemon:get-status", () => fetchHealth());
+
+  ipcMain.handle("daemon:add-remote-server", async (_e, serverUrl: string, token: string) => {
+    const active = await ensureActiveProfile();
+    try {
+      const res = await fetch(`http://127.0.0.1:${active.port}/remote/add`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ server_url: serverUrl, token }),
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        throw new Error(body || `${res.status}`);
+      }
+      return await res.json();
+    } catch (err) {
+      console.error("[daemon] add-remote-server failed:", err);
+      throw err;
+    }
+  });
+
+  ipcMain.handle("daemon:remove-remote-server", async (_e, serverUrl: string) => {
+    const active = await ensureActiveProfile();
+    try {
+      await fetch(`http://127.0.0.1:${active.port}/remote/remove`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ server_url: serverUrl }),
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch (err) {
+      console.warn("[daemon] remove-remote-server failed:", err);
+    }
+  });
+
   // The host's OS name, available regardless of daemon state. The Runtimes
   // page uses it as a fallback identity for "this machine" when no
   // app-managed daemon is reporting a device name (e.g. the daemon runs

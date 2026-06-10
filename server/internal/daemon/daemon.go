@@ -146,6 +146,12 @@ type Daemon struct {
 	// deleted bare clone and an unrelated `not empty` cleanup failure.
 	bgSyncs sync.WaitGroup
 
+	// remoteServers tracks live connections to remote Rimedeck servers for
+	// compute sharing. Each entry has its own Client, heartbeat goroutines,
+	// and lifecycle. Managed via /remote/add and /remote/remove health endpoints.
+	remotesMu     sync.Mutex
+	remoteServers map[string]*remoteServer
+
 	runner             taskRunner    // executes agent tasks; set to d.runTask by New(), overridable in tests
 	cancelPollInterval time.Duration // how often handleTask polls for server-side cancellation; overridable in tests
 	// runUpdateFn executes the brew-or-download upgrade. Set to d.runUpdate by
@@ -176,6 +182,7 @@ func New(cfg Config, logger *slog.Logger) *Daemon {
 		runtimeGoneInflight:       make(map[string]struct{}),
 		reregisterNextAttempt:     make(map[string]time.Time),
 		reregisterLastCompletedAt: make(map[string]time.Time),
+		remoteServers:             make(map[string]*remoteServer),
 		cancelPollInterval:        5 * time.Second,
 	}
 	d.runner = taskRunnerFunc(d.runTask)
@@ -673,6 +680,9 @@ func (d *Daemon) RestartBinary() string {
 
 // deregisterRuntimes notifies the server that all runtimes are going offline.
 func (d *Daemon) deregisterRuntimes() {
+	// Deregister remote servers first.
+	d.deregisterAllRemotes()
+
 	runtimeIDs := d.allRuntimeIDs()
 	if len(runtimeIDs) == 0 {
 		d.logger.Debug("deregister: no runtimes to deregister")

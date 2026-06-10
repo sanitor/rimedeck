@@ -129,6 +129,8 @@ func (d *Daemon) serveHealth(ctx context.Context, ln net.Listener, startedAt tim
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", d.healthHandler(startedAt))
 	mux.HandleFunc("/shutdown", d.shutdownHandler())
+	mux.HandleFunc("/remote/add", d.remoteAddHandler())
+	mux.HandleFunc("/remote/remove", d.remoteRemoveHandler())
 
 	mux.HandleFunc("/repo/checkout", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -198,5 +200,68 @@ func (d *Daemon) serveHealth(ctx context.Context, ln net.Listener, startedAt tim
 	d.logger.Info("health server listening", "addr", ln.Addr().String())
 	if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
 		d.logger.Warn("health server error", "error", err)
+	}
+}
+
+func (d *Daemon) remoteAddHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var req struct {
+			ServerURL string `json:"server_url"`
+			Token     string `json:"token"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		if req.ServerURL == "" || req.Token == "" {
+			http.Error(w, "server_url and token are required", http.StatusBadRequest)
+			return
+		}
+
+		runtimes, err := d.AddRemoteServer(r.Context(), req.ServerURL, req.Token)
+		if err != nil {
+			d.logger.Warn("remote/add failed", "server_url", req.ServerURL, "error", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"status":   "ok",
+			"runtimes": runtimes,
+		})
+	}
+}
+
+func (d *Daemon) remoteRemoveHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var req struct {
+			ServerURL string `json:"server_url"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		if req.ServerURL == "" {
+			http.Error(w, "server_url is required", http.StatusBadRequest)
+			return
+		}
+
+		if err := d.RemoveRemoteServer(req.ServerURL); err != nil {
+			d.logger.Warn("remote/remove failed", "server_url", req.ServerURL, "error", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	}
 }

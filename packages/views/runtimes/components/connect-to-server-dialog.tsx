@@ -53,25 +53,21 @@ export function ConnectToServerDialog({ onClose }: { onClose: () => void }) {
 
       const data: { token: string; workspace_id: string } = await res.json();
 
-      // Tell daemon-manager the remote URL BEFORE syncToken, so
-      // syncToken writes server_url to the daemon CLI profile.
-      // Frontend stays on local — this is compute sharing only.
+      // Register runtimes on the remote server via the running daemon's
+      // /remote/add endpoint. No daemon restart needed — runtimes and
+      // heartbeats start immediately.
       const daemonAPI = (window as unknown as Record<string, unknown>).daemonAPI as
-        | { setTargetApiUrl?: (u: string) => Promise<void>;
-            syncToken?: (t: string, u: string) => Promise<void>;
-            restart?: () => Promise<unknown> }
+        | { addRemoteServer?: (url: string, token: string) => Promise<unknown> }
         | undefined;
-      if (daemonAPI?.syncToken && data.token) {
+      if (daemonAPI?.addRemoteServer && data.token) {
         try {
-          await daemonAPI.setTargetApiUrl?.(url);
-          await daemonAPI.syncToken(data.token, "");
-          // Fire-and-forget: don't await restart — it can take seconds
-          // and the UI should be responsive immediately.
-          void daemonAPI.restart?.();
-        } catch { /* best effort */ }
+          await daemonAPI.addRemoteServer(url, data.token);
+        } catch (err) {
+          console.warn("[connect-to-server] addRemoteServer failed:", err);
+        }
       }
 
-      // Persist for reference (daemon already has the token in its profile).
+      // Persist for reference.
       localStorage.setItem(
         "rimedeck_remote_server",
         JSON.stringify({ url, token: data.token, workspaceId: data.workspace_id }),
