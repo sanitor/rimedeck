@@ -49,6 +49,10 @@ function AppContent() {
   const [bootstrapping, setBootstrapping] = useState(false);
   const autoLoginAttempted = useRef(false);
 
+  const runtimeConfig = window.desktopAPI.runtimeConfig.ok
+    ? window.desktopAPI.runtimeConfig.config
+    : null;
+
   // Auto-login for local mode — no login dialog needed.
   // The Go server accepts the dev verification code (MULTICA_DEV_VERIFICATION_CODE)
   // without a prior sendCode call, so we skip sendCode entirely to avoid the
@@ -77,10 +81,6 @@ function AppContent() {
       }
     })();
   }, [isLoading, bootstrapping, user, isRemote, qc]);
-
-  const runtimeConfig = window.desktopAPI.runtimeConfig.ok
-    ? window.desktopAPI.runtimeConfig.config
-    : null;
 
   // Tell the main process which backend URL we talk to, so daemon-manager
   // can pick the matching CLI profile (server_url from ~/.multica config).

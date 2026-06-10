@@ -38,6 +38,7 @@
     "./workspace/new-workspace-page": "./workspace/new-workspace-page.tsx",
     "./workspace/welcome-after-onboarding": "./workspace/welcome-after-onboarding.tsx",
     "./workspace/use-workspace-seen": "./workspace/use-workspace-seen.ts",
+    "./workspace/join-workspace-dialog": "./workspace/join-workspace-dialog.tsx",
     "./layout": "./layout/index.ts",
     "./auth": "./auth/index.ts",
     "./search": "./search/index.ts",
