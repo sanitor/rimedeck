@@ -18,6 +18,77 @@ jobs:
           PG_PREFIX=$(brew --prefix postgresql@17)
           mkdir -p pgsql
           cp -RH "$PG_PREFIX"/* pgsql/
+
+          # Homebrew PG links against external dylibs (icu4c, openssl, zstd,
+          # lz4, krb5, readline, gettext). Copy them into pgsql/lib/ so the
+          # bundle is self-contained on machines without Homebrew.
+          DEPS=(
+            "$(brew --prefix icu4c@78)/lib/libicui18n.78.dylib"
+            "$(brew --prefix icu4c@78)/lib/libicuuc.78.dylib"
+            "$(brew --prefix icu4c@78)/lib/libicudata.78.dylib"
+            "$(brew --prefix openssl@3)/lib/libssl.3.dylib"
+            "$(brew --prefix openssl@3)/lib/libcrypto.3.dylib"
+            "$(brew --prefix zstd)/lib/libzstd.1.dylib"
+            "$(brew --prefix lz4)/lib/liblz4.1.dylib"
+            "$(brew --prefix krb5)/lib/libgssapi_krb5.2.2.dylib"
+            "$(brew --prefix krb5)/lib/libkrb5.3.3.dylib"
+            "$(brew --prefix krb5)/lib/libk5crypto.3.1.dylib"
+            "$(brew --prefix krb5)/lib/libkrb5support.0.1.dylib"
+            "$(brew --prefix krb5)/lib/libkrb5support.1.1.dylib"
+            "$(brew --prefix krb5)/lib/libcom_err.3.0.dylib"
+            "$(brew --prefix readline)/lib/libreadline.8.dylib"
+            "$(brew --prefix gettext)/lib/libintl.8.dylib"
+          )
+          for dep in "${DEPS[@]}"; do
+            [ -f "$dep" ] && cp -H "$dep" pgsql/lib/ && echo "copied $dep"
+          done
+
+          # Rewrite dylib paths in ALL binaries
+          find pgsql/bin -type f -perm +111 | while read binpath; do
+            otool -L "$binpath" 2>/dev/null | awk 'NR>1{print $1}' | while read dep; do
+              case "$dep" in @*|/usr/lib/*|/System/*) continue;; esac
+              libname=$(basename "$dep")
+              if [ -f "pgsql/lib/$libname" ]; then
+                install_name_tool -change "$dep" "@loader_path/../lib/$libname" "$binpath"
+              elif [ -f "pgsql/lib/postgresql/$libname" ]; then
+                install_name_tool -change "$dep" "@loader_path/../lib/postgresql/$libname" "$binpath"
+              fi
+            done
+          done
+
+          # Rewrite dylib paths in lib/*.dylib (top-level)
+          find pgsql/lib -maxdepth 1 -name '*.dylib' | while read libpath; do
+            libfile=$(basename "$libpath")
+            install_name_tool -id "@loader_path/$libfile" "$libpath" 2>/dev/null || true
+            otool -L "$libpath" 2>/dev/null | awk 'NR>1{print $1}' | while read dep; do
+              case "$dep" in @*|/usr/lib/*|/System/*) continue;; esac
+              depname=$(basename "$dep")
+              if [ -f "pgsql/lib/$depname" ]; then
+                install_name_tool -change "$dep" "@loader_path/$depname" "$libpath"
+              fi
+            done
+          done
+
+          # Rewrite dylib paths in lib/postgresql/ — refs to lib/ need ../
+          find pgsql/lib/postgresql -type f \( -name '*.dylib' -o -perm +111 \) | while read libpath; do
+            libfile=$(basename "$libpath")
+            install_name_tool -id "@loader_path/$libfile" "$libpath" 2>/dev/null || true
+            otool -L "$libpath" 2>/dev/null | awk 'NR>1{print $1}' | while read dep; do
+              case "$dep" in @*|/usr/lib/*|/System/*) continue;; esac
+              depname=$(basename "$dep")
+              if [ -f "pgsql/lib/postgresql/$depname" ]; then
+                install_name_tool -change "$dep" "@loader_path/$depname" "$libpath"
+              elif [ -f "pgsql/lib/$depname" ]; then
+                install_name_tool -change "$dep" "@loader_path/../$depname" "$libpath"
+              fi
+            done
+          done
+
+          # Re-codesign after modifying
+          find pgsql/bin pgsql/lib -type f \( -perm +111 -o -name '*.dylib' \) | while read f; do
+            codesign -s - --force "$f" 2>/dev/null || true
+          done
+
           tar czf pg-17-darwin-arm64.tar.gz pgsql
 
       - name: Upload to release
