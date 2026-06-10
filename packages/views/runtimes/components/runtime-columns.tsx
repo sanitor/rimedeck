@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useQuery } from "@tanstack/react-query";
 import type { AgentRuntime, MemberWithUser } from "@multica/core/types";
+import { useAuthStore } from "@multica/core/auth";
 import { deriveWorkload } from "@multica/core/agents";
 import {
   deriveRuntimeHealth,
@@ -474,12 +475,13 @@ function RowMenu({
   canDelete: boolean;
 }) {
   const { t } = useT("runtimes");
+  const user = useAuthStore((s) => s.user);
   const [deleteOpen, setDeleteOpen] = useState(false);
   // Delete is currently the only row action; if the row can't run it, drop
   // the kebab entirely so the column doesn't render an empty popover. The
   // self-healing case (local + online) is the runtime-detail parity fix —
   // see isSelfHealingRuntime for the rationale.
-  const selfHealing = isSelfHealingRuntime(runtime);
+  const selfHealing = isSelfHealingRuntime(runtime, user?.id);
 
   if (!canDelete || selfHealing) {
     return <span aria-hidden />;

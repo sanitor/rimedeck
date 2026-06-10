@@ -9,8 +9,13 @@ import { getCustomPricing } from "@multica/core/runtimes/custom-pricing-store";
 // delete (daemon self-heal, #2404), so deleting an online local runtime from
 // the UI has no lasting effect. Both the detail page and the list row menu
 // gate their Delete affordance on this same predicate.
-export function isSelfHealingRuntime(runtime: AgentRuntime): boolean {
-  return runtime.runtime_mode === "local" && runtime.status === "online";
+// Only applies to runtimes owned by the current user — remote daemon
+// runtimes are mode="local" + status="online" too, but they DON'T
+// self-heal when deleted from the host.
+export function isSelfHealingRuntime(runtime: AgentRuntime, currentUserId?: string | null): boolean {
+  if (runtime.runtime_mode !== "local" || runtime.status !== "online") return false;
+  if (!currentUserId) return true;
+  return runtime.owner_id === currentUserId;
 }
 
 // ---------------------------------------------------------------------------

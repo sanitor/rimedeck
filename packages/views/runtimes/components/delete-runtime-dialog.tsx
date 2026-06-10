@@ -119,7 +119,7 @@ export function DeleteRuntimeDialog({
     // Defensive re-check of the self-healing rule — the affordance is
     // gated upstream, but a local daemon that came online while the
     // dialog was open should still block the action.
-    if (isSelfHealingRuntime(runtime)) {
+    if (isSelfHealingRuntime(runtime, user?.id)) {
       toast.error(
         t(($) => $.detail.delete_dialog.cascade.self_healing_blocked_toast),
       );

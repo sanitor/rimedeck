@@ -449,8 +449,9 @@ function DiagnosticsCard({
   onDelete: () => void;
 }) {
   const { t } = useT("runtimes");
+  const user = useAuthStore((s) => s.user);
   const isLocal = runtime.runtime_mode === "local";
-  const selfHealing = isSelfHealingRuntime(runtime);
+  const selfHealing = isSelfHealingRuntime(runtime, user?.id);
   // canDelete here doubles as the "can edit runtime" predicate — it already
   // means "workspace owner/admin OR runtime owner", which is the same gate
   // the server enforces for the visibility PATCH.
