@@ -89,7 +89,10 @@ jobs:
       - name: Bundle PostgreSQL
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          echo "GH_TOKEN length: ${#GH_TOKEN}"
+          gh auth status || true
           gh release download $PG_RELEASE_TAG --pattern "pg-17-darwin-arm64.tar.gz" --repo ${{ github.repository }}
           tar xzf pg-17-darwin-arm64.tar.gz
           mkdir -p apps/desktop/resources/pgsql
@@ -160,6 +163,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release download $PG_RELEASE_TAG --pattern "pg-17-windows-x64.zip" --repo ${{ github.repository }}
           unzip -qo pg-17-windows-x64.zip
@@ -235,6 +239,7 @@ jobs:
       - name: Bundle PostgreSQL
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "GH_TOKEN length: ${#GH_TOKEN}"
           gh auth status || true
