@@ -282,8 +282,9 @@ func (h *Handler) DaemonRegister(w http.ResponseWriter, r *http.Request) {
 	// (the SQL COALESCE preserves any existing owner on upsert).
 	// PAT/JWT tokens require a membership check and set OwnerID from the member.
 	var ownerID pgtype.UUID
-	if daemonWsID := middleware.DaemonWorkspaceIDFromContext(r.Context()); daemonWsID != "" {
-		if daemonWsID != req.WorkspaceID {
+	isDaemonToken := middleware.DaemonWorkspaceIDFromContext(r.Context()) != ""
+	if isDaemonToken {
+		if middleware.DaemonWorkspaceIDFromContext(r.Context()) != req.WorkspaceID {
 			writeError(w, http.StatusNotFound, "workspace not found")
 			return
 		}
@@ -394,6 +395,18 @@ func (h *Handler) DaemonRegister(w http.ResponseWriter, r *http.Request) {
 					provider,
 					0,
 				))
+			}
+			// Runtimes registered via daemon token are shared compute —
+			// default them to public so any workspace member can use them.
+			if isDaemonToken {
+				if updated, err := h.Queries.UpdateAgentRuntimeVisibility(r.Context(), db.UpdateAgentRuntimeVisibilityParams{
+					ID:         registered.ID,
+					Visibility: "public",
+				}); err != nil {
+					slog.Warn("daemon register: failed to set runtime public", "runtime_id", uuidToString(registered.ID), "error", err)
+				} else {
+					registered.Visibility = updated.Visibility
+				}
 			}
 		}
 
@@ -520,7 +533,8 @@ func (h *Handler) GetDaemonWorkspaceRepos(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, workspaceReposResponse(workspaceID, ws.Repos, ws.Settings))
 }
 
-// DaemonDeregister marks runtimes as offline when the daemon shuts down.
+// DaemonDeregister marks runtimes as offline (or deletes them if no agents
+// are bound) when the daemon shuts down.
 func (h *Handler) DaemonDeregister(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		RuntimeIDs []string `json:"runtime_ids"`
@@ -556,9 +570,22 @@ func (h *Handler) DaemonDeregister(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		if err := h.Queries.SetAgentRuntimeOffline(r.Context(), rt.ID); err != nil {
-			slog.Warn("deregister: failed to set offline", "runtime_id", rid, "error", err)
-			continue
+		// If no active agents are bound, delete the runtime immediately
+		// instead of leaving it offline for 7 days. This keeps the host's
+		// runtime list clean after a remote machine disconnects.
+		activeCount, countErr := h.Queries.CountActiveAgentsByRuntime(r.Context(), rt.ID)
+		if countErr == nil && activeCount == 0 {
+			_ = h.Queries.DeleteArchivedAgentsByRuntime(r.Context(), rt.ID)
+			if err := h.Queries.DeleteAgentRuntime(r.Context(), rt.ID); err != nil {
+				slog.Warn("deregister: failed to delete unbound runtime", "runtime_id", rid, "error", err)
+			} else {
+				slog.Info("deregister: deleted unbound runtime", "runtime_id", rid)
+			}
+		} else {
+			if err := h.Queries.SetAgentRuntimeOffline(r.Context(), rt.ID); err != nil {
+				slog.Warn("deregister: failed to set offline", "runtime_id", rid, "error", err)
+				continue
+			}
 		}
 		h.Analytics.Capture(analytics.RuntimeOffline(
 			uuidToString(rt.OwnerID),
