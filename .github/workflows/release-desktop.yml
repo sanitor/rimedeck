@@ -87,21 +87,24 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Use GitHub API + curl instead of `gh release download` to avoid
-          # gh CLI auth issues on macOS runners.
-          ASSET_URL=$(curl -sL \
+          REPO="${{ github.repository }}"
+          FILE="pg-17-darwin-arm64.tar.gz"
+          # Get browser_download_url from release API (works for public repos)
+          DL_URL=$(curl -fsSL \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/tags/$PG_RELEASE_TAG" \
-            | jq -r '.assets[] | select(.name == "pg-17-darwin-arm64.tar.gz") | .url')
-          curl -sL -o pg-17-darwin-arm64.tar.gz \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/octet-stream" \
-            "$ASSET_URL"
-          tar xzf pg-17-darwin-arm64.tar.gz
+            "https://api.github.com/repos/${REPO}/releases/tags/${PG_RELEASE_TAG}" \
+            | jq -r --arg f "$FILE" '.assets[] | select(.name == $f) | .browser_download_url')
+          if [ -z "$DL_URL" ] || [ "$DL_URL" = "null" ]; then
+            echo "::error::Asset $FILE not found in release $PG_RELEASE_TAG"
+            exit 1
+          fi
+          echo "Downloading $DL_URL"
+          curl -fsSL -o "$FILE" "$DL_URL"
+          tar xzf "$FILE"
           mkdir -p apps/desktop/resources/pgsql
           cp -R pgsql/* apps/desktop/resources/pgsql/
-          rm -rf pgsql pg-17-darwin-arm64.tar.gz
+          rm -rf pgsql "$FILE"
 
       - name: Clean existing macOS release assets
         env:
@@ -168,16 +171,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ASSET_URL=$(curl -sL \
+          REPO="${{ github.repository }}"
+          FILE="pg-17-windows-x64.zip"
+          DL_URL=$(curl -fsSL \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/tags/$PG_RELEASE_TAG" \
-            | jq -r '.assets[] | select(.name == "pg-17-windows-x64.zip") | .url')
-          curl -sL -o pg-17-windows-x64.zip \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/octet-stream" \
-            "$ASSET_URL"
-          unzip -qo pg-17-windows-x64.zip
+            "https://api.github.com/repos/${REPO}/releases/tags/${PG_RELEASE_TAG}" \
+            | jq -r --arg f "$FILE" '.assets[] | select(.name == $f) | .browser_download_url')
+          if [ -z "$DL_URL" ] || [ "$DL_URL" = "null" ]; then
+            echo "::error::Asset $FILE not found in release $PG_RELEASE_TAG"
+            exit 1
+          fi
+          echo "Downloading $DL_URL"
+          curl -fsSL -o "$FILE" "$DL_URL"
+          unzip -qo "$FILE"
           mkdir -p apps/desktop/resources/pgsql
           cp -R pgsql/* apps/desktop/resources/pgsql/
           rm -rf pgsql pg-17-windows-x64.zip
@@ -251,16 +258,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ASSET_URL=$(curl -sL \
+          REPO="${{ github.repository }}"
+          FILE="pg-17-linux-x64.tar.gz"
+          DL_URL=$(curl -fsSL \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/tags/$PG_RELEASE_TAG" \
-            | jq -r '.assets[] | select(.name == "pg-17-linux-x64.tar.gz") | .url')
-          curl -sL -o pg-17-linux-x64.tar.gz \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/octet-stream" \
-            "$ASSET_URL"
-          tar xzf pg-17-linux-x64.tar.gz
+            "https://api.github.com/repos/${REPO}/releases/tags/${PG_RELEASE_TAG}" \
+            | jq -r --arg f "$FILE" '.assets[] | select(.name == $f) | .browser_download_url')
+          if [ -z "$DL_URL" ] || [ "$DL_URL" = "null" ]; then
+            echo "::error::Asset $FILE not found in release $PG_RELEASE_TAG"
+            exit 1
+          fi
+          echo "Downloading $DL_URL"
+          curl -fsSL -o "$FILE" "$DL_URL"
+          tar xzf "$FILE"
           mkdir -p apps/desktop/resources/pgsql
           cp -R pgsql/* apps/desktop/resources/pgsql/
           rm -rf pgsql pg-17-linux-x64.tar.gz
