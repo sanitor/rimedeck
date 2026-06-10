@@ -9,10 +9,6 @@ on:
       version:
         description: "Release version (e.g. 0.3.18)"
         required: true
-      force:
-        description: "Delete existing assets before uploading (overwrite)"
-        type: boolean
-        default: false
 
 permissions:
   contents: write
@@ -56,19 +52,6 @@ jobs:
           gh release view "$TAG" --repo ${{ github.repository }} 2>/dev/null || \
             gh release create "$TAG" --repo ${{ github.repository }} --title "RimeDeck $TAG" --generate-notes
 
-      - name: Delete existing assets (force overwrite)
-        if: ${{ github.event.inputs.force == 'true' }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="${{ steps.version.outputs.tag }}"
-          echo "Force mode: deleting existing assets from release $TAG"
-          gh release view "$TAG" --repo ${{ github.repository }} --json assets -q '.assets[].name' | while read -r name; do
-            if [ -n "$name" ]; then
-              echo "  deleting $name"
-              gh release delete-asset "$TAG" "$name" --repo ${{ github.repository }} --yes
-            fi
-          done
     outputs:
       tag: ${{ steps.version.outputs.tag }}
       version: ${{ steps.version.outputs.version }}
@@ -110,6 +93,21 @@ jobs:
           cp -R pgsql/* apps/desktop/resources/pgsql/
           rm -rf pgsql pg-17-darwin-arm64.tar.gz
 
+      - name: Clean existing macOS release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ needs.create-release.outputs.tag }}"
+          ASSETS=$(gh release view "$TAG" --repo ${{ github.repository }} --json assets -q '.assets[].name' 2>/dev/null || echo "")
+          for name in $ASSETS; do
+            case "$name" in
+              *-mac-*|latest-mac.yml|latest-mac-arm64.yml)
+                echo "Deleting: $name"
+                gh release delete-asset "$TAG" "$name" --repo ${{ github.repository }} --yes || true
+                ;;
+            esac
+          done
+
       - name: Package Desktop (macOS arm64)
         working-directory: apps/desktop
         env:
@@ -117,6 +115,16 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
           RELEASE_VERSION: ${{ needs.create-release.outputs.version }}
         run: node scripts/package.mjs --mac --arm64 --publish always
+
+      - name: Ensure assets uploaded (clobber)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ needs.create-release.outputs.tag }}"
+          cd apps/desktop/dist
+          for f in *.dmg *.zip *.blockmap latest-mac*.yml; do
+            [ -f "$f" ] && gh release upload "$TAG" "$f" --clobber --repo ${{ github.repository }} || true
+          done
 
   build-windows:
     needs: create-release
@@ -156,6 +164,22 @@ jobs:
           cp -R pgsql/* apps/desktop/resources/pgsql/
           rm -rf pgsql pg-17-windows-x64.zip
 
+      - name: Clean existing Windows release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ needs.create-release.outputs.tag }}"
+          ASSETS=$(gh release view "$TAG" --repo ${{ github.repository }} --json assets -q '.assets[].name' 2>/dev/null || echo "")
+          for name in $ASSETS; do
+            case "$name" in
+              *-windows-*|latest.yml|latest-arm64.yml)
+                echo "Deleting: $name"
+                gh release delete-asset "$TAG" "$name" --repo ${{ github.repository }} --yes || true
+                ;;
+            esac
+          done
+
       - name: Package Desktop (Windows x64)
         working-directory: apps/desktop
         env:
@@ -163,6 +187,17 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
           RELEASE_VERSION: ${{ needs.create-release.outputs.version }}
         run: node scripts/package.mjs --win --x64 --publish always
+
+      - name: Ensure assets uploaded (clobber)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ needs.create-release.outputs.tag }}"
+          cd apps/desktop/dist
+          for f in *.exe *.blockmap latest.yml latest-arm64.yml; do
+            [ -f "$f" ] && gh release upload "$TAG" "$f" --clobber --repo ${{ github.repository }} || true
+          done
 
   build-linux:
     needs: create-release
@@ -204,6 +239,21 @@ jobs:
           cp -R pgsql/* apps/desktop/resources/pgsql/
           rm -rf pgsql pg-17-linux-x64.tar.gz
 
+      - name: Clean existing Linux release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ needs.create-release.outputs.tag }}"
+          ASSETS=$(gh release view "$TAG" --repo ${{ github.repository }} --json assets -q '.assets[].name' 2>/dev/null || echo "")
+          for name in $ASSETS; do
+            case "$name" in
+              *-linux-*|latest-linux*.yml)
+                echo "Deleting: $name"
+                gh release delete-asset "$TAG" "$name" --repo ${{ github.repository }} --yes || true
+                ;;
+            esac
+          done
+
       - name: Package Desktop (Linux x64)
         working-directory: apps/desktop
         env:
@@ -211,3 +261,13 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
           RELEASE_VERSION: ${{ needs.create-release.outputs.version }}
         run: node scripts/package.mjs --linux --x64 --publish always
+
+      - name: Ensure assets uploaded (clobber)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ needs.create-release.outputs.tag }}"
+          cd apps/desktop/dist
+          for f in *.AppImage *.deb *.rpm *.blockmap latest-linux*.yml; do
+            [ -f "$f" ] && gh release upload "$TAG" "$f" --clobber --repo ${{ github.repository }} || true
+          done

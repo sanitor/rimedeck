@@ -1108,17 +1108,22 @@ export function setupDaemonManager(
     stopPolling();
     stopLogTail();
 
-    loadPrefs().then(async (prefs) => {
-      if (prefs.autoStop) {
-        isQuitting = true;
-        event.preventDefault();
-        try {
-          await stopDaemon();
-        } catch {
-          // Best-effort stop on quit
+    // preventDefault must be called synchronously — calling it inside an
+    // async .then() is too late and the app exits before stopDaemon runs.
+    event.preventDefault();
+    isQuitting = true;
+
+    loadPrefs()
+      .then(async (prefs) => {
+        if (prefs.autoStop) {
+          try {
+            await stopDaemon();
+          } catch {
+            // Best-effort stop on quit
+          }
         }
-        app.quit();
-      }
-    });
+      })
+      .catch(() => {})
+      .finally(() => app.quit());
   });
 }
