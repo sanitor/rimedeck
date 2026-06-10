@@ -161,7 +161,11 @@ const desktopAPI = {
   switchRuntimeConfig: (config: {
     apiUrl: string;
     wsUrl: string;
+    authToken?: string;
   }): Promise<void> => ipcRenderer.invoke("runtime-config:switch", config),
+  /** Retrieve the persisted auth token from remote_connection.json. */
+  getRemoteAuthToken: (): Promise<string | null> =>
+    ipcRenderer.invoke("runtime-config:get-auth-token"),
   /** Disconnect from the remote server and restore the local backend. */
   disconnectRuntimeConfig: (): Promise<void> =>
     ipcRenderer.invoke("runtime-config:disconnect"),

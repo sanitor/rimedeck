@@ -12,6 +12,7 @@ import { ThemeProvider } from "@multica/ui/components/common/theme-provider";
 import { MulticaIcon } from "@multica/ui/components/common/multica-icon";
 import { Toaster } from "@multica/ui/components/ui/sonner";
 import { DesktopLoginPage } from "./pages/login";
+import { RemoteReconnectPage } from "./pages/remote-reconnect";
 import { DesktopShell } from "./components/desktop-layout";
 import { PageviewTracker } from "./components/pageview-tracker";
 import { UpdateNotification } from "./components/update-notification";
@@ -286,7 +287,13 @@ function AppContent() {
   return (
     <>
       <PageviewTracker />
-      {user ? <DesktopShell /> : <DesktopLoginPage />}
+      {user ? (
+        <DesktopShell />
+      ) : isRemote && runtimeConfig ? (
+        <RemoteReconnectPage apiUrl={runtimeConfig.apiUrl} />
+      ) : (
+        <DesktopLoginPage />
+      )}
     </>
   );
 }

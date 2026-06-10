@@ -650,11 +650,22 @@ func (h *Handler) RedeemInvitation(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if isUniqueViolation(err) {
-			writeError(w, http.StatusConflict, "already a member of this workspace")
+			// Already a member — look up existing record and continue to
+			// issue fresh JWT + daemon token. This enables reconnection
+			// with a new invite code when the previous JWT has expired.
+			existing, lookupErr := qtx.GetMemberByUserAndWorkspace(r.Context(), db.GetMemberByUserAndWorkspaceParams{
+				UserID:      user.ID,
+				WorkspaceID: accepted.WorkspaceID,
+			})
+			if lookupErr != nil {
+				writeError(w, http.StatusInternalServerError, "failed to look up existing membership")
+				return
+			}
+			member = existing
+		} else {
+			writeError(w, http.StatusInternalServerError, "failed to create membership")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "failed to create membership")
-		return
 	}
 
 	if _, err := qtx.MarkUserOnboarded(r.Context(), user.ID); err != nil {

@@ -55,14 +55,15 @@ export function JoinWorkspaceDialog({ onClose }: { onClose: () => void }) {
       const data: { token?: string; auth_token?: string; workspace_id?: string; user_id?: string } =
         await redeemRes.json();
 
-      // Switch the frontend API to the remote server.
+      // Switch the frontend API to the remote server and persist the JWT
+      // to remote_connection.json so it survives localStorage clears.
       const desktopAPI = (window as unknown as Record<string, unknown>).desktopAPI as
-        | { switchRuntimeConfig?: (c: { apiUrl: string; wsUrl: string }) => Promise<void> }
+        | { switchRuntimeConfig?: (c: { apiUrl: string; wsUrl: string; authToken?: string }) => Promise<void> }
         | undefined;
 
       if (desktopAPI?.switchRuntimeConfig) {
         const wsUrl = url.replace(/^http/, "ws") + "/ws";
-        await desktopAPI.switchRuntimeConfig({ apiUrl: url, wsUrl });
+        await desktopAPI.switchRuntimeConfig({ apiUrl: url, wsUrl, authToken: data.auth_token });
       }
 
       // Store the remote server's JWT so the post-reload auth

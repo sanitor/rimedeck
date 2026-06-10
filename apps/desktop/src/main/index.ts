@@ -79,7 +79,13 @@ if (process.platform === "win32") {
 const PROTOCOL = "rimedeck";
 const REMOTE_CONFIG_PATH = join(homedir(), ".rimedeck", "remote_connection.json");
 
-function loadRemoteConfig(): { apiUrl: string; wsUrl: string } | null {
+interface RemoteConfig {
+  apiUrl: string;
+  wsUrl: string;
+  authToken?: string;
+}
+
+function loadRemoteConfig(): RemoteConfig | null {
   try {
     const raw = readFileSync(REMOTE_CONFIG_PATH, "utf-8");
     const obj = JSON.parse(raw);
@@ -88,7 +94,7 @@ function loadRemoteConfig(): { apiUrl: string; wsUrl: string } | null {
   return null;
 }
 
-function saveRemoteConfig(config: { apiUrl: string; wsUrl: string } | null): void {
+function saveRemoteConfig(config: RemoteConfig | null): void {
   try {
     if (config) {
       mkdirSync(join(homedir(), ".rimedeck"), { recursive: true });
@@ -447,7 +453,7 @@ if (!gotTheLock) {
 
     ipcMain.handle(
       "runtime-config:switch",
-      (_event, config: { apiUrl: string; wsUrl: string }) => {
+      (_event, config: { apiUrl: string; wsUrl: string; authToken?: string }) => {
         const wsUrl = config.apiUrl.replace(/^http/, "ws") + "/ws";
         runtimeConfigResult = {
           ok: true,
@@ -458,10 +464,15 @@ if (!gotTheLock) {
             appUrl: config.apiUrl,
           },
         };
-        saveRemoteConfig({ apiUrl: config.apiUrl, wsUrl });
+        saveRemoteConfig({ apiUrl: config.apiUrl, wsUrl, authToken: config.authToken });
         mainWindow?.webContents.send("runtime-config:changed", runtimeConfigResult);
       },
     );
+
+    ipcMain.handle("runtime-config:get-auth-token", () => {
+      const cfg = loadRemoteConfig();
+      return cfg?.authToken ?? null;
+    });
 
     ipcMain.handle("runtime-config:disconnect", () => {
       saveRemoteConfig(null);

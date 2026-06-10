@@ -613,10 +613,35 @@ Rimedeck 不感知 Tailscale 的存在，但在 UI 和网络层做好兼容：
 
 #### 重连
 
+**自动重连**（App 重启时）：
+
+`remote_connection.json` 持久化 `{ apiUrl, wsUrl, authToken }`。App 启动时检测到远端连接后进入重连流程（`RemoteReconnectPage`），而非显示邮箱登录页：
+
+```
+App 启动 → loadRemoteConfig() → 有远端配置
+  → 恢复 JWT（remote_connection.json.authToken → localStorage）
+  → api.getMe() 尝试连接
+  ┌─ 成功 → 正常进入工作区
+  ├─ 网络错误（地址不通）→ 显示重连页：
+  │   ├─ "重试" → 再次 getMe()
+  │   ├─ "更换地址" → 输入新 IP/域名 → switchRuntimeConfig → 用已存 JWT 重试
+  │   └─ "断开连接" → disconnect 流程 → 回到本机
+  └─ 401（JWT 过期）→ 显示重连页：
+      ├─ "重新加入" → JoinWorkspaceDialog（地址预填）→ 用新邀请码获取新 JWT
+      └─ "断开连接" → disconnect 流程 → 回到本机
+```
+
+**关键设计**：
+- JWT 同时存储在 `localStorage` 和 `remote_connection.json.authToken`（磁盘备份，防止浏览器缓存清理丢失）
+- 地址变更只需输入新地址，不需要新邀请码（JWT 仍然有效）
+- 推荐使用 Tailscale 域名连接（地址不变，重连始终成功）
+- `RedeemInvitation` 已有 member 时不返回 409，而是签发新 JWT + daemon token（允许用新邀请码重新获取凭据）
+- auto-login（`local@rimedeck.local`）在 `isRemote=true` 时跳过，不会误创建远端用户
+
+**其他重连场景**：
+
 - **网络闪断**：前端 WebSocket 自动重连（`use-realtime-sync.ts`）；daemon 心跳 + WS 退避自动恢复
-- **Client 重启**：前端从 `remote_connection.json` 恢复远端 URL；daemon 从 profile config 读 `server_url` + `token` 自动注册
 - **Server 重启**：daemon `handleRuntimeGone` → 重注册 → `RecoverOrphans`；前端 WebSocket 重连
-- **JWT 过期**（默认 30 天）：前端 auth store 收到 401 → 清除 token → 用户被登出。需重新邀请加入
 - **Daemon token 过期**（365天后）：daemon 心跳认证失败，需重新邀请加入
 
 ---
@@ -700,7 +725,7 @@ daemon token（`mdt_*`）注册的 runtime 没有 `owner_id`（`daemon.go` 中 d
 
 ### 已知限制
 
-1. **JWT 过期无刷新机制**：赎回时签发的 JWT 默认 30 天过期。过期后远端用户被登出，只能通过新邀请码重新加入。未来可考虑 token refresh 端点
+1. **JWT 过期需重新邀请**：JWT 默认 30 天过期。重连页会引导用户输入新邀请码重新获取 JWT（`RedeemInvitation` 对已有 member 签发新凭据，不需要主机删除旧 member）。未来可考虑 token refresh 端点
 2. **成员记录不自动清理**：断开后 Server 端的 member 行保留，需管理员手动移除
 3. **单 daemon 单 server**：daemon 一次只能连一个 server（本地或远端），不支持同时服务多个 server。切换到远端后本机 server 的 runtime 会因无心跳而被标记 offline
 4. **daemon token 注册的 runtime 无 owner_id**：普通 member 无法通过 `canEditRuntime` 检查删除这些 runtime，需 owner/admin 操作
