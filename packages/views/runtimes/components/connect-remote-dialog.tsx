@@ -68,18 +68,23 @@ export function ConnectRemoteDialog({ onClose }: { onClose: () => void }) {
 
   // Polling fallback: the WS event can be missed if the connection drops
   // briefly during daemon restart. Poll the runtime list every 3 seconds
-  // and transition to success when a new daemon_id appears.
+  // and transition to success when a new daemon_id appears OR an
+  // existing one comes back online.
   useEffect(() => {
     if (step !== "instructions") return;
     const poll = async () => {
       try {
         const runtimes = await api.listRuntimes({ workspace_id: wsId });
-        const currentIds = new Set(runtimes.map((r) => r.daemon_id ?? r.id));
+        const onlineIds = new Set(
+          runtimes
+            .filter((r) => r.status === "online")
+            .map((r) => r.daemon_id ?? r.id),
+        );
         if (initialDaemonIdsRef.current === null) {
-          initialDaemonIdsRef.current = currentIds;
+          initialDaemonIdsRef.current = onlineIds;
           return;
         }
-        const hasNew = [...currentIds].some((id) => !initialDaemonIdsRef.current!.has(id));
+        const hasNew = [...onlineIds].some((id) => !initialDaemonIdsRef.current!.has(id));
         if (hasNew) {
           qc.invalidateQueries({ queryKey: runtimeKeys.all(wsId) });
           setStep("success");
