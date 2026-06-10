@@ -233,6 +233,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          echo "GH_TOKEN length: ${#GH_TOKEN}"
+          gh auth status || true
           gh release download $PG_RELEASE_TAG --pattern "pg-17-linux-x64.tar.gz" --repo ${{ github.repository }}
           tar xzf pg-17-linux-x64.tar.gz
           mkdir -p apps/desktop/resources/pgsql
